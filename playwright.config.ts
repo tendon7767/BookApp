@@ -3,9 +3,12 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  timeout: process.env.CI ? 60_000 : 30_000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // GitHub's shared Linux runner can become memory-bound when Chromium and
+  // WebKit build EPUB pagination concurrently. Serial CI is slower but stable.
+  workers: process.env.CI ? 1 : undefined,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: { baseURL: 'http://localhost:4173/BookApp/', trace: 'retain-on-failure' },
   projects: [
