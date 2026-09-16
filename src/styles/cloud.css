@@ -1,0 +1,162 @@
+.cloud-screen {
+  padding-bottom: calc(112px + env(safe-area-inset-bottom));
+}
+.cloud-screen > h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-title);
+  margin-bottom: 8px;
+}
+.cloud-screen > .quiet-note {
+  margin: 12px 0;
+}
+.cloud-account {
+  padding: 16px;
+  margin: 20px 0;
+  font-size: var(--text-body);
+  overflow-wrap: anywhere;
+}
+.cloud-account > .quiet-note {
+  margin-top: 6px;
+}
+.cloud-actions,
+.cloud-book-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+.cloud-actions button,
+.cloud-book-actions button,
+.add-book-options button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.cloud-notice {
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: 1.7;
+  margin: 16px 0;
+  overflow-wrap: anywhere;
+}
+.cloud-notice button {
+  margin-top: 10px;
+}
+.cloud-search,
+.cloud-config input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 16px;
+}
+.cloud-search {
+  margin-top: 20px;
+}
+.cloud-books {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 20px;
+}
+.cloud-books > li {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.cloud-books strong {
+  font-size: var(--text-body);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.cloud-books p {
+  margin-top: 5px;
+  font-size: var(--text-meta);
+  color: var(--muted);
+  line-height: 1.6;
+}
+.cloud-book-actions {
+  margin-top: 10px;
+}
+.cloud-book-actions button {
+  min-height: 44px;
+}
+.cloud-config {
+  margin-top: 24px;
+  font-size: var(--text-body);
+  border-top: 1px solid var(--border);
+}
+.cloud-config summary {
+  min-height: 48px;
+  padding: 14px 0;
+  cursor: pointer;
+}
+.cloud-config form {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+.cloud-config label {
+  display: grid;
+  gap: 8px;
+}
+.cloud-config .quiet-note {
+  margin: 0;
+}
+.add-book-options {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0 16px;
+}
+.cloud-conflict-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.cloud-conflict-choice small {
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+.cloud-screen > details > summary {
+  padding: 14px 0;
+  min-height: 48px;
+  cursor: pointer;
+  font-size: var(--text-body);
+}
+.cloud-books > li {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+}
+.cloud-books > li > span,
+.cloud-books > li > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cloud-books > li > button {
+  flex-shrink: 0;
+}
+.cloud-status-button {
+  background: transparent;
+  border: 0;
+  min-height: 44px;
+  padding: 0 4px;
+  font: inherit;
+  cursor: pointer;
+}
+.cloud-status-button {
+  font-size: var(--text-meta);
+}

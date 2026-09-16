@@ -1,0 +1,400 @@
+.reader-screen {
+  --bg: #f6f3ec;
+  --surface: #fcfaf5;
+  --ink: #303b34;
+  --muted: #74786c;
+  --accent: #526852;
+  --accent-soft: #e8ecdf;
+  --border: #dedfd4;
+  color-scheme: light;
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  z-index: 15;
+  background: var(--reader-bg, var(--bg));
+  color: var(--ink);
+  overflow: hidden;
+}
+.reader-screen[data-reader-theme='light'] {
+  --bg: #fafbfc;
+  --surface: #fff;
+  --ink: #2b3831;
+  --muted: #69746e;
+  --accent: #45644f;
+  --accent-soft: #e9f0ea;
+  --border: #dde3df;
+}
+.reader-screen[data-reader-theme='dark'] {
+  --bg: #191e1b;
+  --surface: #222923;
+  --ink: #e3e8dd;
+  --muted: #a4afa1;
+  --accent: #bacda9;
+  --accent-soft: #313e31;
+  --border: #3a443b;
+  color-scheme: dark;
+}
+.epub-host,
+.text-host {
+  position: absolute;
+  inset: calc(env(safe-area-inset-top) + 16px)
+    max(var(--reader-margin, 24px), env(safe-area-inset-right))
+    calc(env(safe-area-inset-bottom) + 42px)
+    max(var(--reader-margin, 24px), env(safe-area-inset-left));
+  overflow: hidden;
+}
+.text-host {
+  top: calc(env(safe-area-inset-top) + 36px);
+  color: var(--reader-ink);
+}
+.text-page {
+  display: flow-root;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.text-page p {
+  margin: 0;
+  padding: 0;
+  min-height: 1lh;
+}
+.text-page p + p {
+  margin-top: var(--paragraph-space);
+}
+.text-page p.text-blank {
+  min-height: 0;
+  height: 0;
+  line-height: 0;
+  margin: 0;
+}
+.text-encoding {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-meta);
+}
+.text-encoding select {
+  min-height: 44px;
+  max-width: 230px;
+  padding: 4px 8px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: var(--text-section);
+}
+.reader-touch-surface {
+  position: absolute;
+  inset: 0;
+  touch-action: pinch-zoom;
+}
+.reader-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 6px) 12px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.reader-toolbar h1 {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-section);
+}
+.reader-progress-toggle {
+  position: absolute;
+  bottom: env(safe-area-inset-bottom);
+  left: calc(50% - 70px);
+  width: 140px;
+  min-height: 44px;
+  font-size: var(--text-meta);
+  background: transparent;
+  color: var(--reader-ink, var(--muted));
+}
+.aa-label {
+  font-size: 19px;
+}
+.typography-panel {
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 32px #0002;
+  width: min(100%, 480px);
+  max-height: 62dvh;
+  padding: 0 18px calc(env(safe-area-inset-bottom) + 8px);
+  margin: auto auto 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.typography-panel::backdrop {
+  background: transparent;
+}
+.typography-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  min-height: 48px;
+}
+.typography-header h2 {
+  font-size: var(--text-section);
+}
+.typography-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  font-size: var(--text-body);
+}
+.typography-row > span {
+  width: 64px;
+  flex-shrink: 0;
+}
+.typography-row select {
+  flex: 1;
+  width: 0;
+  min-height: 44px;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: var(--text-section);
+}
+.typography-row input[type='range'] {
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  accent-color: var(--accent);
+}
+.typography-row > output {
+  min-width: 35px;
+  text-align: right;
+  color: var(--muted);
+}
+.font-size-control {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--accent-soft);
+  border-radius: 8px;
+}
+.font-size-control button {
+  min-width: 60px;
+  min-height: 44px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+.font-size-control output {
+  font-size: var(--text-title);
+  font-variant-numeric: tabular-nums;
+}
+.reading-theme-options {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0;
+}
+.reading-theme-options button {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: var(--text-body);
+}
+.reading-theme-options button[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.custom-colors {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: var(--text-meta);
+}
+.custom-colors label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.custom-colors input {
+  width: 36px;
+  height: 44px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+}
+.custom-colors button {
+  background: transparent;
+  text-decoration: underline;
+  font-size: var(--text-meta);
+  min-height: 44px;
+  padding: 4px;
+}
+.typography-note {
+  color: var(--muted);
+  font-size: var(--text-meta);
+  margin: 4px 0;
+}
+.reader-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 12px max(20px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 10px)
+    max(20px, env(safe-area-inset-left));
+}
+.reader-slider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 640px;
+  margin: auto;
+}
+.reader-slider input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  accent-color: var(--accent);
+}
+.reader-slider output {
+  font-size: var(--text-meta);
+  min-width: 40px;
+  text-align: right;
+}
+.reader-actions {
+  display: flex;
+  max-width: 640px;
+  margin: auto;
+  justify-content: space-between;
+}
+.reader-actions button {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  min-height: 44px;
+  font-size: var(--text-body);
+}
+.reader-hint {
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-meta);
+  margin-top: 8px;
+}
+.reader-loading {
+  position: absolute;
+  inset: 80px 24px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  line-height: 1.8;
+  font-size: var(--text-body);
+  pointer-events: none;
+}
+.reader-notice {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 66px);
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: var(--text-meta);
+  line-height: 1.7;
+}
+.reader-notice button {
+  min-height: 44px;
+  background: var(--accent-soft);
+  border-radius: 6px;
+  flex-shrink: 0;
+  padding: 8px;
+}
+.toc-dialog {
+  padding: 12px 20px calc(env(safe-area-inset-bottom) + 20px);
+}
+.toc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.toc-header h2 {
+  font-size: var(--text-title);
+}
+.toc-dialog ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.toc-dialog ol ol {
+  padding-left: 16px;
+}
+.toc-dialog nav {
+  max-height: 65dvh;
+  overflow: auto;
+}
+.toc-dialog li > button {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 0;
+  line-height: 1.6;
+  font-size: var(--text-body);
+  text-align: left;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+}
+.toc-dialog [aria-current='location'] {
+  color: var(--accent);
+  font-weight: 700;
+}
+@media (min-width: 760px) {
+  .epub-host,
+  .text-host {
+    max-width: 720px;
+    margin-inline: auto;
+  }
+}
+
+.typography-content {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.typography-header h2 {
+  font-size: var(--text-title);
+}
+.default-typography-panel {
+  max-height: calc(100dvh - env(safe-area-inset-top) - 24px);
+}
+.default-typography-panel::backdrop {
+  background: #16231970;
+}
+.typography-preview {
+  margin: 8px 0 16px;
+  padding-block: 16px;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: 8px;
+}
+.default-typography-footer {
+  padding: 12px 0;
+}

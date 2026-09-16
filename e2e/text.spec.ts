@@ -1,0 +1,191 @@
+import { test, expect, type Page } from '@playwright/test'
+import { preview } from 'vite'
+
+const text = Array.from(
+  { length: 12 },
+  (_, chapter) =>
+    `第${chapter + 1}章 測試故事\n` +
+    Array.from({ length: 45 }, (_, p) =>
+      `段落${chapter}-${p}：窗外下著雨，旅人翻開書頁，繼續讀著故事。🌿 那是一個安靜的午後。`.repeat(
+        3,
+      ),
+    ).join('\n\n'),
+).join('\n')
+const menu = (page: Page) => page.getByRole('button', { name: '閱讀選單', exact: true })
+async function savedOffset(page: Page) {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const r = indexedDB.open('kanshu-local')
+      r.onsuccess = () => resolve(r.result)
+      r.onerror = () => reject(r.error)
+    })
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const r = db.transaction('progress').objectStore('progress').openCursor()
+        r.onsuccess = () => resolve(r.result?.value.location.characterOffset ?? -1)
+        r.onerror = () => reject(r.error)
+      })
+    } finally {
+      db.close()
+    }
+  })
+}
+async function importText(page: Page, buffer = Buffer.from(text)) {
+  await expect(page.getByLabel('選擇書籍檔案')).toBeEnabled()
+  await page
+    .getByLabel('選擇書籍檔案')
+    .setInputFiles({ name: '文字測試.txt', mimeType: 'text/plain', buffer })
+  await page.getByRole('button', { name: '開啟 文字測試', exact: true }).click()
+  await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
+  await expect(menu(page)).toBeVisible()
+}
+test('TXT pages have no gaps, restore exact offsets through typography/resize, and support TOC/seek', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto('./')
+  await importText(page)
+  await menu(page).click()
+  const host = page.locator('.text-host')
+  const next = page.getByRole('button', { name: '下一頁', exact: true })
+  const previous = page.getByRole('button', { name: '上一頁', exact: true })
+  const starts: number[] = []
+  for (let i = 0; i < 6; i++) {
+    const start = Number(await host.getAttribute('data-start'))
+    const end = Number(await host.getAttribute('data-end'))
+    starts.push(start)
+    const paragraphs = await host.locator('p').allTextContents()
+    expect(paragraphs.join('\n').replaceAll('\u200b', '')).toBe(
+      text.slice(start, end).replace(/\n$/, ''),
+    )
+    const overflow = await host.evaluate(
+      (el) => el.firstElementChild!.getBoundingClientRect().height - el.clientHeight,
+    )
+    expect(overflow).toBeLessThanOrEqual(0.1)
+    await next.click()
+    await expect(next).toBeEnabled()
+    await expect(host).toHaveAttribute('data-start', String(end))
+  }
+  for (const start of starts.reverse()) {
+    await previous.click()
+    await expect(next).toBeEnabled()
+    await expect(host).toHaveAttribute('data-start', String(start))
+  }
+  await page.getByRole('button', { name: '目錄', exact: true }).click()
+  await page.getByRole('button', { name: '第8章 測試故事', exact: true }).click()
+  await expect(host).toHaveAttribute('data-start', String(text.indexOf('第8章')))
+  await page.getByRole('slider', { name: '閱讀進度' }).fill('68')
+  await expect.poll(() => savedOffset(page)).toBe(Math.floor(text.length * 0.68))
+  const anchor = await savedOffset(page)
+  await page.getByRole('button', { name: '閱讀排版' }).click()
+  for (let i = 0; i < 6; i++) await page.getByRole('button', { name: '放大字級' }).click()
+  await page.getByRole('combobox', { name: '字體', exact: true }).selectOption('sans')
+  await page.getByRole('slider', { name: '行距', exact: true }).fill('2.2')
+  await page.getByRole('slider', { name: '段落間距', exact: true }).fill('1.4')
+  await page.getByRole('slider', { name: '左右邊距', exact: true }).fill('38')
+  await page.getByRole('button', { name: '深夜', exact: true }).click()
+  await page.getByRole('button', { name: '關閉排版' }).click()
+  await expect(next).toBeEnabled()
+  await expect(host.locator('.text-page')).toHaveCSS('font-size', '26px')
+  expect(await savedOffset(page)).toBe(anchor)
+  await expect(host).toHaveAttribute('data-start', String(anchor))
+  await page.setViewportSize({ width: 852, height: 393 })
+  await expect(host).toHaveCSS('height', '315px')
+  await expect(host).toHaveAttribute('data-start', String(anchor))
+  await page.getByRole('button', { name: '返回書架' }).click()
+  await page.getByRole('button', { name: '開啟 文字測試', exact: true }).click()
+  await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
+  await expect(menu(page)).toBeVisible()
+  await expect(host).toHaveAttribute('data-start', String(anchor))
+  await expect(host.locator('.text-page')).toHaveCSS('font-size', '26px')
+  // Going back from a restored/seeked position calculates a preceding page on demand.
+  await menu(page).click()
+  await previous.click()
+  await expect(next).toBeEnabled()
+  await expect(host).toHaveAttribute('data-end', String(anchor))
+  await next.click()
+  await expect(next).toBeEnabled()
+  await expect(host).toHaveAttribute('data-start', String(anchor))
+  await page.getByRole('slider', { name: '閱讀進度' }).fill('100')
+  await expect(next).toBeDisabled()
+  await expect(menu(page)).toHaveText('100%')
+  await page.getByRole('slider', { name: '閱讀進度' }).fill('0')
+  await expect(previous).toBeDisabled()
+  expect(errors).toEqual([])
+})
+
+test('large TXT stays bounded and encoding override survives reopen', async ({ page }) => {
+  test.setTimeout(60000)
+  await page.goto('./')
+  const chunk = Buffer.from([
+    0xb2, 0xc4, 0xa4, 0x40, 0xb3, 0xb9, 0x0a, 0xb4, 0xfa, 0xb8, 0xd5, 0x0a,
+  ])
+  const large = Buffer.concat([chunk, Buffer.alloc(8 * 1024 * 1024, 0x61)])
+  await importText(page, large)
+  await menu(page).click()
+  const selector = page.getByRole('combobox', { name: 'TXT 編碼' })
+  await selector.selectOption('big5')
+  await expect(selector).toBeEnabled()
+  await expect(page.locator('.text-host')).toContainText('第一章')
+  await selector.selectOption('utf-8')
+  await expect(selector).toBeEnabled()
+  await expect(page.getByRole('alert')).toContainText('部分文字無法解碼')
+  await selector.selectOption('big5')
+  await expect(selector).toBeEnabled()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await page.getByRole('slider', { name: '閱讀進度' }).fill('68')
+  await expect.poll(() => savedOffset(page)).toBeGreaterThan(5000000)
+  expect((await page.locator('.text-host').textContent())!.length).toBeLessThan(8193)
+  await page.getByRole('button', { name: '返回書架' }).click()
+  const anchor = await savedOffset(page)
+  await page.getByRole('button', { name: '開啟 文字測試', exact: true }).click()
+  await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
+  await expect(menu(page)).toBeVisible()
+  await menu(page).click()
+  await expect(selector).toHaveValue('big5')
+  await expect(page.locator('.text-host')).toHaveAttribute('data-start', String(anchor))
+})
+
+test('TXT decoder, first import and reopen work after the origin stops', async ({
+  page,
+  context,
+}) => {
+  const server = await preview({ preview: { host: 'localhost', port: 0, strictPort: true } })
+  const address = server.httpServer.address()
+  if (!address || typeof address === 'string') throw new Error('No server address')
+  const url = `http://localhost:${address.port}/BookApp/`
+  const stop = () =>
+    new Promise<void>((resolve, reject) => {
+      if ('closeAllConnections' in server.httpServer) server.httpServer.closeAllConnections()
+      server.httpServer.close((e) => (e ? reject(e) : resolve()))
+    })
+  let stopped = false
+  try {
+    await page.goto(url)
+    await expect(page.getByText('可離線開啟 · 書籍需先下載')).toBeVisible()
+    await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true)
+    await stop()
+    stopped = true
+    await importText(page)
+    await menu(page).click()
+    await page.getByRole('button', { name: '下一頁', exact: true }).click()
+    await expect.poll(() => savedOffset(page)).toBeGreaterThan(0)
+    const anchor = await savedOffset(page)
+    const reopened = await context.newPage()
+    await page.close()
+    await reopened.goto(url)
+    await reopened.getByRole('button', { name: '開啟 文字測試', exact: true }).click()
+    await reopened.getByRole('button', { name: '開始閱讀', exact: true }).click()
+    await expect(menu(reopened)).toBeVisible()
+    await expect(reopened.locator('.text-host')).toHaveAttribute('data-start', String(anchor))
+    await menu(reopened).click()
+    await reopened.getByRole('button', { name: '目錄', exact: true }).click()
+    await reopened.getByRole('button', { name: '第3章 測試故事', exact: true }).click()
+    await reopened.getByRole('button', { name: '閱讀排版' }).click()
+    await reopened.getByRole('button', { name: '放大字級' }).click()
+    await expect(reopened.locator('.text-page')).toHaveCSS('font-size', '21px')
+  } finally {
+    if (!stopped) await stop()
+  }
+})
