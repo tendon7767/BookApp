@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'vitest'
 import { deleteDB, openDB } from 'idb'
-import { DATABASE_NAME, openReaderDatabase, readPreferences } from './database'
+import { DATABASE_NAME, DATABASE_VERSION, openReaderDatabase, readPreferences } from './database'
 import { associateCloudDownload, listCloudBooks, rememberCloudFiles } from './cloudRepository'
 import type { DriveFile } from '../features/cloud/types'
 
@@ -57,7 +57,7 @@ it('adds cloud stores to v4 without changing settings, book bytes or reading pro
   await old.put('progress', progress, 'local')
   old.close()
   const upgraded = await openReaderDatabase()
-  expect(upgraded.version).toBe(6)
+  expect(upgraded.version).toBe(DATABASE_VERSION)
   expect(
     new Uint8Array(((await upgraded.get('bookFiles', 'local')) as { bytes: ArrayBuffer }).bytes),
   ).toEqual(new Uint8Array([1, 2, 3]))

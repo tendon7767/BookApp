@@ -9,18 +9,23 @@ import { usePwaStatus } from './platform/usePwaStatus'
 import { useLibrary } from './features/library/useLibrary'
 import { useCloudLibrary } from './features/cloud/useCloudLibrary'
 import { CloudLibraryScreen } from './features/cloud/CloudLibraryScreen'
+import { StorageScreen } from './features/settings/StorageScreen'
 
 const TextReader = lazy(() => import('./features/reader/text/TextReader'))
 const EpubReader = lazy(() => import('./features/reader/epub/EpubReader'))
 
 export default function App() {
-  const [screen, setScreen] = useState<'library' | 'settings' | 'cloud'>('library')
+  const [screen, setScreen] = useState<'library' | 'settings' | 'cloud' | 'storage'>('library')
   const [installOpen, setInstallOpen] = useState(false)
   const [reading, setReading] = useState<BookMetadata | null>(null)
   const settings = usePreferences()
   const status = usePwaStatus()
   const library = useLibrary()
-  const cloud = useCloudLibrary(screen === 'cloud', status.online, library.reload)
+  const cloud = useCloudLibrary(
+    screen === 'cloud' || screen === 'storage',
+    status.online,
+    library.reload,
+  )
   function navigate(next: typeof screen) {
     setScreen(next)
     window.scrollTo({ top: 0 })
@@ -120,6 +125,17 @@ export default function App() {
           <LibraryScreen library={library} onRead={(book) => void openBook(book)} />
         ) : screen === 'cloud' ? (
           <CloudLibraryScreen cloud={cloud} online={status.online} />
+        ) : screen === 'storage' ? (
+          <StorageScreen
+            books={library.books}
+            cloudConnected={cloud.connected}
+            online={status.online}
+            cloudError={cloud.error}
+            busy={!!cloud.busy}
+            onDownload={cloud.downloadBooks}
+            onCloud={() => navigate('cloud')}
+            onChanged={library.reload}
+          />
         ) : (
           <SettingsScreen
             preferences={settings.preferences}
@@ -130,6 +146,7 @@ export default function App() {
             onReadingDefaults={settings.setReadingDefaults}
             onInstall={() => setInstallOpen(true)}
             onCloud={() => navigate('cloud')}
+            onStorage={() => navigate('storage')}
           />
         )}
         {screen === 'library' && settings.storageError && (

@@ -4,8 +4,10 @@ import { useRef } from 'react'
 // Native pinch zoom remains available; links and text selection are not exposed in this mode.
 export function ReaderGestures({
   onGesture,
+  tapZones,
 }: {
   onGesture: (gesture: 'next' | 'previous' | 'toggle') => void
+  tapZones: 'horizontal' | 'vertical'
 }) {
   const start = useRef<{ id: number; x: number; y: number; time: number } | null>(null)
   return (
@@ -39,7 +41,10 @@ export function ReaderGestures({
           onGesture(dx < 0 ? 'next' : 'previous')
         else if (Math.abs(dx) < 12 && Math.abs(dy) < 12 && elapsed < 500) {
           const rect = event.currentTarget.getBoundingClientRect()
-          const ratio = (event.clientX - rect.left) / rect.width
+          const ratio =
+            tapZones === 'vertical'
+              ? (event.clientY - rect.top) / rect.height
+              : (event.clientX - rect.left) / rect.width
           onGesture(ratio < 0.28 ? 'previous' : ratio > 0.72 ? 'next' : 'toggle')
         }
       }}

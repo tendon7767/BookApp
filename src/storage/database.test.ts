@@ -47,6 +47,7 @@ describe('local preferences and versioned storage', () => {
       'preferences',
       'progress',
       'readerSettings',
+      'readingMarks',
       'syncState',
     ])
     expect(await reopened.get('preferences', 'app')).toEqual({ theme: 'dark' })

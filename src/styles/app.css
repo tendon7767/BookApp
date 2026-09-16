@@ -267,6 +267,104 @@ h1 {
   font-size: var(--text-meta);
   color: var(--muted);
 }
+.storage-summary {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.storage-summary > svg {
+  color: var(--accent);
+}
+.storage-summary p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+.storage-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.storage-list-header h2 {
+  font-size: var(--text-section);
+}
+.storage-list-header button {
+  min-height: 44px;
+  padding: 0 6px;
+  color: var(--accent);
+  background: transparent;
+}
+.storage-book-list {
+  border-block: 1px solid var(--border);
+}
+.storage-book-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 8px 2px;
+}
+.storage-book-row + .storage-book-row {
+  border-top: 1px solid var(--border);
+}
+.storage-book-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.storage-book-row strong,
+.storage-book-row div > span {
+  display: block;
+}
+.storage-book-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+}
+.storage-book-row div > span,
+.storage-state {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+.storage-state {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.storage-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+.storage-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 52px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+.storage-connect {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+}
+@media (max-width: 390px) {
+  .storage-actions {
+    grid-template-columns: 1fr;
+  }
+}
 .inline-warning {
   border: 1px solid var(--border);
   border-radius: 8px;

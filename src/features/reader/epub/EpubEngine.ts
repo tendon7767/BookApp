@@ -4,6 +4,7 @@ import type { ReaderAdapter } from '../ReaderAdapter'
 import type { ReadingLocation } from '../../../domain/book'
 import { parseReadingSettings, type ReadingSettings } from '../readingSettings'
 import { readingStyles } from './readingStyles'
+import type { ReaderSearchResult } from '../search'
 
 export interface EpubPosition {
   cfi: string
@@ -128,6 +129,36 @@ export class EpubEngine implements ReaderAdapter<Extract<ReadingLocation, { form
 
   async toc(): Promise<NavItem[]> {
     return (await this.book.loaded.navigation).toc
+  }
+
+  async search(query: string): Promise<ReaderSearchResult[]> {
+    const term = query.trim()
+    if (!term || this.disposed) return []
+    await this.indexing?.catch(() => undefined)
+    const sections: Section[] = []
+    this.book.spine.each((section: Section) => {
+      if (section.linear) sections.push(section)
+    })
+    const results: ReaderSearchResult[] = []
+    for (const section of sections) {
+      if (this.disposed || results.length >= 100) break
+      try {
+        await section.load(this.book.load.bind(this.book))
+        const matches = section.find(term) as unknown as Array<{ cfi: string; excerpt: string }>
+        for (const match of matches) {
+          if (results.length >= 100) break
+          results.push({
+            id: `${section.index}:${results.length}:${match.cfi}`,
+            location: { format: 'epub', cfi: match.cfi },
+            excerpt: match.excerpt.replace(/\s+/g, ' ').trim(),
+          })
+        }
+      } finally {
+        section.unload()
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    }
+    return results
   }
 
   prepareLocations(cache: string | undefined, save: (value: string) => Promise<void>) {

@@ -22,6 +22,7 @@ export interface ReadingSettings {
   theme: keyof typeof readerThemes
   textColor: string | null
   backgroundColor: string | null
+  tapZones: 'horizontal' | 'vertical'
 }
 export const defaultReadingSettings: ReadingSettings = {
   fontFamily: 'serif',
@@ -32,6 +33,7 @@ export const defaultReadingSettings: ReadingSettings = {
   theme: 'paper',
   textColor: null,
   backgroundColor: null,
+  tapZones: 'horizontal',
 }
 function number(value: unknown, fallback: number, min: number, max: number, step: number) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
@@ -67,6 +69,7 @@ export function parseReadingSettings(
         : readingFallback,
     textColor: color(data.textColor),
     backgroundColor: color(data.backgroundColor),
+    tapZones: data.tapZones === 'vertical' ? 'vertical' : 'horizontal',
   }
 }
 export function readingColors(settings: ReadingSettings) {

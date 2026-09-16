@@ -120,14 +120,20 @@ export async function saveImportedBook(
 }
 
 export async function removeBookDownload(id: string) {
+  return removeBookDownloads([id])
+}
+
+export async function removeBookDownloads(ids: string[]) {
   const db = await openReaderDatabase()
   try {
     const tx = db.transaction(['books', 'bookFiles', 'epubLocations'], 'readwrite')
-    const book = await tx.objectStore('books').get(id)
-    if (book?.cloudSource) {
-      await tx.objectStore('bookFiles').delete(id)
-      await tx.objectStore('epubLocations').delete(id)
-      await tx.objectStore('books').put({ ...book, downloaded: false })
+    for (const id of new Set(ids)) {
+      const book = await tx.objectStore('books').get(id)
+      if (book?.cloudSource) {
+        await tx.objectStore('bookFiles').delete(id)
+        await tx.objectStore('epubLocations').delete(id)
+        await tx.objectStore('books').put({ ...book, downloaded: false })
+      }
     }
     await tx.done
   } finally {
@@ -160,7 +166,15 @@ export async function deleteLocalBook(id: string): Promise<void> {
 export async function deleteLocalBooks(ids: string[]): Promise<void> {
   const database = await openReaderDatabase()
   const transaction = database.transaction(
-    ['books', 'bookFiles', 'bookCovers', 'progress', 'epubLocations', 'readerSettings'],
+    [
+      'books',
+      'bookFiles',
+      'bookCovers',
+      'progress',
+      'epubLocations',
+      'readerSettings',
+      'readingMarks',
+    ],
     'readwrite',
   )
   void transaction.done.catch(() => undefined)
@@ -172,6 +186,7 @@ export async function deleteLocalBooks(ids: string[]): Promise<void> {
       await transaction.objectStore('progress').delete(id)
       await transaction.objectStore('epubLocations').delete(id)
       await transaction.objectStore('readerSettings').delete(id)
+      await transaction.objectStore('readingMarks').delete(id)
     }
     await transaction.done
   } catch (error) {

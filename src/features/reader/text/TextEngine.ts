@@ -2,6 +2,7 @@ import type { ReadingLocation, TextEncodingChoice } from '../../../domain/book'
 import type { ReaderAdapter } from '../ReaderAdapter'
 import { readerFonts, type ReadingSettings } from '../readingSettings'
 import { boundaries, clampOffset, encodingChoice, type TextDocument } from './textDocument'
+import type { ReaderSearchResult } from '../search'
 
 type TextLocation = Extract<ReadingLocation, { format: 'txt' }>
 export interface TextPosition {
@@ -194,6 +195,39 @@ export class TextEngine implements ReaderAdapter<TextLocation> {
       format: 'txt',
       characterOffset: Math.floor(this.document.text.length * percentage),
     })
+  }
+  async search(query: string): Promise<ReaderSearchResult[]> {
+    if (!this.document) return []
+    const term = query.trim()
+    if (!term) return []
+    const source = this.document.text.toLocaleLowerCase()
+    const needle = term.toLocaleLowerCase()
+    const results: ReaderSearchResult[] = []
+    let cursor = 0
+    while (results.length < 100) {
+      const offset = source.indexOf(needle, cursor)
+      if (offset < 0) break
+      const start = Math.max(0, offset - 45)
+      const end = Math.min(this.document.text.length, offset + term.length + 45)
+      const chapter = [...this.document.toc]
+        .reverse()
+        .find((item) => Number(item.href) <= offset)?.label
+      results.push({
+        id: `txt:${offset}`,
+        location: {
+          format: 'txt',
+          characterOffset: offset,
+          textVersion: 1,
+          encoding: this.document.encoding,
+          encodingChoice: this.choice,
+        },
+        excerpt: `${start ? '…' : ''}${this.document.text.slice(start, end).replace(/\s+/g, ' ')}${end < this.document.text.length ? '…' : ''}`,
+        chapter,
+      })
+      cursor = offset + Math.max(1, needle.length)
+      if (results.length % 20 === 0) await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    }
+    return results
   }
   async applySettings(settings: ReadingSettings) {
     this.settings = settings

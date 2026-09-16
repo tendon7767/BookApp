@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { NavItem } from 'epubjs'
-import type { BookMetadata, ReadingProgress } from '../../../domain/book'
+import type { BookMetadata, ReadingLocation, ReadingProgress } from '../../../domain/book'
 import { getBookFile } from '../../../storage/bookRepository'
 import {
   readEpubLocations,
@@ -223,9 +223,15 @@ export function useEpubReader(book: BookMetadata) {
     readingSettings,
     settingsError,
     updateSettings,
+    location: position ? ({ format: 'epub', cfi: position.cfi } as const) : null,
     act,
     flush,
     jump: (href: string) => command((reader) => reader.goTo(href)),
+    navigate: (location: ReadingLocation) =>
+      location.format === 'epub'
+        ? command((reader) => reader.navigate(location))
+        : Promise.resolve(),
+    search: (query: string) => engine.current?.search(query) ?? Promise.resolve([]),
     seek: (percentage: number) => command((reader) => reader.seek(percentage)),
   }
 }

@@ -156,6 +156,21 @@ export function TypographyPanel({
             </button>
           ))}
         </div>
+        <div className="tap-zone-options" role="group" aria-label="點按翻頁區域">
+          <span>點按翻頁</span>
+          <button
+            aria-pressed={settings.tapZones === 'horizontal'}
+            onClick={() => change({ tapZones: 'horizontal' })}
+          >
+            左右
+          </button>
+          <button
+            aria-pressed={settings.tapZones === 'vertical'}
+            onClick={() => change({ tapZones: 'vertical' })}
+          >
+            上下
+          </button>
+        </div>
         <div className="custom-colors">
           <label>
             文字色

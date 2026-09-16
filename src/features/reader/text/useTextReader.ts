@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import type { BookMetadata, ReadingProgress, TextEncodingChoice } from '../../../domain/book'
+import type {
+  BookMetadata,
+  ReadingLocation,
+  ReadingProgress,
+  TextEncodingChoice,
+} from '../../../domain/book'
 import { getBookFile } from '../../../storage/bookRepository'
 import { readProgress, saveProgress } from '../../../storage/progressRepository'
 import { readPreferences } from '../../../storage/database'
@@ -180,6 +185,15 @@ export function useTextReader(book: BookMetadata) {
     saveError,
     settingsError,
     readingSettings,
+    location: position
+      ? ({
+          format: 'txt',
+          characterOffset: position.offset,
+          textVersion: 1,
+          encoding,
+          encodingChoice: choice,
+        } as const)
+      : null,
     updateSettings,
     encoding,
     choice,
@@ -194,6 +208,9 @@ export function useTextReader(book: BookMetadata) {
     seek: (ratio: number) => command((r) => r.seek(ratio)),
     jump: (href: string) =>
       command((r) => r.navigate({ format: 'txt', characterOffset: Number(href) })),
+    navigate: (location: ReadingLocation) =>
+      location.format === 'txt' ? command((r) => r.navigate(location)) : Promise.resolve(),
+    search: (query: string) => engine.current?.search(query) ?? Promise.resolve([]),
     flush: async () => {
       await actions.current
       await writes.current.catch(() => undefined)

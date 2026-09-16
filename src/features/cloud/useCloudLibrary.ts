@@ -316,6 +316,25 @@ export function useCloudLibrary(
       await reloadLibrary()
     })
   }
+  async function downloadBooks(books: BookMetadata[]) {
+    const pending = books.filter((book) => book.downloaded === false)
+    if (!pending.length) return true
+    if (!preferences.account || !session.current) {
+      setError('請先連接 Google Drive，再下載書籍。')
+      return false
+    }
+    return run('正在下載書籍…', async (signal) => {
+      try {
+        for (const [index, book] of pending.entries()) {
+          await downloadBook(client(), book, preferences.account!.id, signal, (message) =>
+            setBusy(`${index + 1}/${pending.length} · ${message}`),
+          )
+        }
+      } finally {
+        await reloadLibrary()
+      }
+    })
+  }
   const publishedFields = state?.published
     ? (JSON.parse(state.published) as { document: SyncState['document'] }).document.fields
     : {}
@@ -352,6 +371,7 @@ export function useCloudLibrary(
     resolve,
     restore,
     ensureDownloaded,
+    downloadBooks,
     cancel: () => operation.current?.abort(),
     retrySdk: () => setSdkAttempt((n) => n + 1),
   }

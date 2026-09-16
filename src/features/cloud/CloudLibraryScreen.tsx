@@ -11,6 +11,7 @@ const labels: Record<string, string> = {
   series: '系列',
   volume: '集數',
   progress: '閱讀位置',
+  marks: '書籤與跳轉足跡',
   core: '書籍資料',
   theme: '外觀',
   librarySort: '書架排序',
@@ -21,6 +22,7 @@ const labels: Record<string, string> = {
   margin: '邊距',
   textColor: '文字顏色',
   backgroundColor: '背景顏色',
+  tapZones: '點按翻頁區域',
 }
 function valueLabel(value: Json): string {
   if (value === true) return '保留'
@@ -39,10 +41,14 @@ function valueLabel(value: Json): string {
     recent: '最近閱讀',
     added: '最近加入',
     title: '書名',
+    horizontal: '左右',
+    vertical: '上下',
   }
   if (typeof value === 'string' && choices[value]) return choices[value]
   if (typeof value === 'object' && 'percentage' in value)
     return `${Math.round(Number(value.percentage) * 100)}% · ${new Date(Number(value.updatedAt)).toLocaleString('zh-TW')}`
+  if (typeof value === 'object' && 'bookmarks' in value && 'trail' in value)
+    return `${Array.isArray(value.bookmarks) ? value.bookmarks.length : 0} 個書籤 · ${Array.isArray(value.trail) ? value.trail.length : 0} 筆足跡`
   return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 export function CloudLibraryScreen({

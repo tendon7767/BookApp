@@ -1,11 +1,30 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowLeft, ChevronLeft, ChevronRight, List, X } from 'lucide-react'
-import type { BookMetadata } from '../../domain/book'
+import {
+  ArrowLeft,
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  List,
+  Search,
+  X,
+} from 'lucide-react'
+import type { BookMetadata, ReadingLocation } from '../../domain/book'
+import { emptyReadingMarks, type ReadingMarks } from '../../domain/readingMarks'
+import {
+  addBookmark,
+  popReadingTrail,
+  pushReadingTrail,
+  readReadingMarks,
+  removeBookmark,
+} from '../../storage/readingMarksRepository'
 import { TocDialog } from './TocDialog'
 import { ReaderGestures } from './ReaderGestures'
 import { TypographyPanel } from './TypographyPanel'
 import { readingColors, type ReadingSettings } from './readingSettings'
 import type { TocEntry } from './TocDialog'
+import { ReaderToolsDialog } from './ReaderToolsDialog'
+import type { ReaderSearchResult } from './search'
 
 export interface ReaderState {
   ready: boolean
@@ -21,10 +40,13 @@ export interface ReaderState {
   busy: boolean
   readingSettings: ReadingSettings
   updateSettings: (value: ReadingSettings) => void
+  location: ReadingLocation | null
   act: (gesture: 'next' | 'previous' | 'toggle') => void | Promise<void>
   flush: () => Promise<void>
   seek: (value: number) => Promise<void>
   jump: (href: string) => Promise<void>
+  navigate: (location: ReadingLocation) => Promise<void>
+  search: (query: string) => Promise<ReaderSearchResult[]>
 }
 export function ReaderView({
   book,
@@ -41,11 +63,25 @@ export function ReaderView({
 }) {
   const [tocOpen, setTocOpen] = useState(false)
   const [typographyOpen, setTypographyOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const [marks, setMarks] = useState<ReadingMarks>(emptyReadingMarks)
   const [closing, setClosing] = useState(false)
   const [exitError, setExitError] = useState(false)
   const [slider, setSlider] = useState<number | null>(null)
   const seekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const setReaderNotice = reader.setNotice
   useEffect(() => () => clearTimeout(seekTimer.current), [])
+  useEffect(() => {
+    let active = true
+    void readReadingMarks(book.id)
+      .then((value) => {
+        if (active) setMarks(value)
+      })
+      .catch(() => setReaderNotice('書籤暫時無法讀取，請返回書架後重試。'))
+    return () => {
+      active = false
+    }
+  }, [book.id, setReaderNotice])
   const percentage = reader.position?.percentage
   const label = percentage == null ? '計算進度中…' : `${Math.round(percentage * 100)}%`
   const colors = readingColors(reader.readingSettings)
@@ -64,11 +100,27 @@ export function ReaderView({
       setClosing(false)
     }
   }
+  async function remember(label: string) {
+    if (!reader.location) return
+    try {
+      setMarks(
+        await pushReadingTrail(book.id, {
+          location: reader.location,
+          percentage: reader.position?.percentage ?? 0,
+          label,
+        }),
+      )
+    } catch {
+      reader.setNotice('未能保存跳轉前位置，仍會繼續開啟目標內容。')
+    }
+  }
   function seek(value: number) {
     setSlider(value)
     clearTimeout(seekTimer.current)
     seekTimer.current = setTimeout(() => {
-      void reader.seek(value / 100).finally(() => setSlider(null))
+      void remember(`跳轉前 · ${label}`)
+        .then(() => reader.seek(value / 100))
+        .finally(() => setSlider(null))
     }, 200)
   }
   return (
@@ -95,7 +147,12 @@ export function ReaderView({
       }}
     >
       {children}
-      {reader.ready && <ReaderGestures onGesture={(gesture) => void reader.act(gesture)} />}
+      {reader.ready && (
+        <ReaderGestures
+          tapZones={reader.readingSettings.tapZones}
+          onGesture={(gesture) => void reader.act(gesture)}
+        />
+      )}
       {!reader.ready && (
         <div className="reader-loading" role={reader.error ? 'alert' : 'status'}>
           {reader.error || '正在開書…'}
@@ -159,6 +216,25 @@ export function ReaderView({
               <List size={20} />
               目錄
             </button>
+            <button onClick={() => setToolsOpen(true)}>
+              <Search size={19} />
+              搜尋
+            </button>
+            <button
+              onClick={() => {
+                if (!reader.location) return
+                void addBookmark(book.id, {
+                  location: reader.location,
+                  percentage: reader.position?.percentage ?? 0,
+                  label: reader.position?.href || `${label} 的位置`,
+                })
+                  .then(setMarks)
+                  .catch(() => reader.setNotice('書籤未能保存，請稍後重試。'))
+              }}
+            >
+              <Bookmark size={19} />
+              書籤
+            </button>
             <button aria-label="閱讀排版" onClick={() => setTypographyOpen(true)}>
               <span className="aa-label">Aa</span>
             </button>
@@ -170,8 +246,24 @@ export function ReaderView({
               <ChevronRight size={20} />
             </button>
           </div>
+          {marks.trail.length > 0 && (
+            <button
+              className="reader-return-button"
+              onClick={() => {
+                void popReadingTrail(book.id).then(({ marks: next, popped }) => {
+                  setMarks(next)
+                  if (popped) void reader.navigate(popped.location)
+                })
+              }}
+            >
+              <History size={18} /> 返回跳轉前位置
+            </button>
+          )}
           {extraControls}
-          <p className="reader-hint">左右點按或滑動翻頁 · 點中央開關選單</p>
+          <p className="reader-hint">
+            {reader.readingSettings.tapZones === 'vertical' ? '上下點按' : '左右點按'} ·
+            左右滑動翻頁 · 點中央開關選單
+          </p>
         </footer>
       )}
       {(reader.notice || reader.saveError || reader.settingsError || exitError) && (
@@ -204,8 +296,20 @@ export function ReaderView({
           onClose={() => setTocOpen(false)}
           onSelect={(href) => {
             setTocOpen(false)
-            void reader.jump(href)
+            void remember(`目錄跳轉前 · ${label}`).then(() => reader.jump(href))
           }}
+        />
+      )}
+      {toolsOpen && (
+        <ReaderToolsDialog
+          marks={marks}
+          onClose={() => setToolsOpen(false)}
+          onSearch={reader.search}
+          onSelect={(result) => {
+            setToolsOpen(false)
+            void remember(`跳轉前 · ${label}`).then(() => reader.navigate(result.location))
+          }}
+          onRemoveBookmark={(id) => void removeBookmark(book.id, id).then(setMarks)}
         />
       )}
       {typographyOpen && (

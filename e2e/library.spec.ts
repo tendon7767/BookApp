@@ -113,11 +113,10 @@ test('imports an EPUB for the first time after the origin is stopped and retains
   const address = server.httpServer.address()
   if (!address || typeof address === 'string') throw new Error('Preview address unavailable')
   const url = `http://localhost:${address.port}/BookApp/`
-  const stop = () =>
-    new Promise<void>((resolve, reject) => {
-      if ('closeAllConnections' in server.httpServer) server.httpServer.closeAllConnections()
-      server.httpServer.close((error) => (error ? reject(error) : resolve()))
-    })
+  const stop = async () => {
+    if ('closeAllConnections' in server.httpServer) server.httpServer.closeAllConnections()
+    await server.close()
+  }
   let stopped = false
   try {
     await page.goto(url)

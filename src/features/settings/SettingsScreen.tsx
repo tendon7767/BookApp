@@ -41,6 +41,7 @@ interface Props {
   onTheme: (theme: Theme) => Promise<void>
   onInstall: () => void
   onCloud: () => void
+  onStorage: () => void
   onReadingDefaults: (settings: ReadingSettings) => Promise<void>
 }
 
@@ -53,6 +54,7 @@ export function SettingsScreen({
   onInstall,
   onReadingDefaults,
   onCloud,
+  onStorage,
 }: Props) {
   const [defaultsOpen, setDefaultsOpen] = useState(false)
   return (
@@ -120,6 +122,14 @@ export function SettingsScreen({
             </div>
             {status.offlineState === 'ready' && <Check size={18} />}
           </div>
+          <button className="settings-row interactive-row" onClick={onStorage}>
+            <HardDrive size={21} />
+            <div>
+              <strong>儲存空間與下載</strong>
+              <p>查看用量、批次下載，或移除已有雲端備份的本機書檔</p>
+            </div>
+            <ChevronRight size={19} />
+          </button>
           <button className="settings-row interactive-row" onClick={onInstall}>
             <CircleHelp size={21} />
             <div>

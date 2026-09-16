@@ -5,6 +5,7 @@ import type { StoredBinary } from './binary'
 import type { ReadingSettings } from '../features/reader/readingSettings'
 import type { CloudBook, CloudPreferences } from '../features/cloud/types'
 import type { SyncState } from '../features/cloud/syncModel'
+import type { ReadingMarks } from '../domain/readingMarks'
 
 interface ReaderDatabase extends DBSchema {
   syncState: { key: string; value: SyncState }
@@ -21,9 +22,10 @@ interface ReaderDatabase extends DBSchema {
   progress: { key: string; value: ReadingProgress }
   epubLocations: { key: string; value: { fileHash: string; version: number; locations: string } }
   readerSettings: { key: string; value: { settings: ReadingSettings; updatedAt: number } }
+  readingMarks: { key: string; value: ReadingMarks }
 }
 export const DATABASE_NAME = 'kanshu-local'
-export const DATABASE_VERSION = 6
+export const DATABASE_VERSION = 7
 
 // Migrations only add stores; never recreate user data on update.
 export function openReaderDatabase(name = DATABASE_NAME): Promise<IDBPDatabase<ReaderDatabase>> {
@@ -61,6 +63,7 @@ export function openReaderDatabase(name = DATABASE_NAME): Promise<IDBPDatabase<R
               .createIndex('by-account', 'accountId')
           }
           if (oldVersion < 6) database.createObjectStore('syncState')
+          if (oldVersion < 7) database.createObjectStore('readingMarks')
         },
         blocked() {
           fail(new Error('另一個「看書」視窗正在使用儲存空間，請關閉後重試。'))

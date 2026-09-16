@@ -149,10 +149,15 @@ async function cloudScreen(page: Page) {
   await page.getByRole('button', { name: /Google Drive/ }).click()
 }
 async function configure(page: Page) {
-  await page.getByLabel('OAuth Client ID').fill('123-test.apps.googleusercontent.com')
-  await page.getByLabel('Picker API Key').fill('AIza-test-public-key-only-1234567890')
-  await page.getByLabel('專案編號').fill('123456')
-  await page.getByRole('button', { name: '儲存 Google 設定', exact: true }).click()
+  const clientId = page.getByLabel('OAuth Client ID')
+  // Pages builds already contain the repository's public VITE_* configuration,
+  // so this administrator-only form is intentionally collapsed there.
+  if (await clientId.isVisible()) {
+    await clientId.fill('123-test.apps.googleusercontent.com')
+    await page.getByLabel('Picker API Key').fill('AIza-test-public-key-only-1234567890')
+    await page.getByLabel('專案編號').fill('123456')
+    await page.getByRole('button', { name: '儲存 Google 設定', exact: true }).click()
+  }
   await expect(page.getByRole('button', { name: '連接 Google Drive', exact: true })).toBeEnabled()
 }
 async function connect(page: Page) {

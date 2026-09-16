@@ -13,6 +13,7 @@ import {
 import type { BookMetadata, ReadingProgress } from '../domain/book'
 import { parsePreferences } from '../features/settings/preferences'
 import { parseReadingSettings, type ReadingSettings } from '../features/reader/readingSettings'
+import type { ReadingMarks } from '../domain/readingMarks'
 
 const stores = [
   'books',
@@ -23,6 +24,7 @@ const stores = [
   'bookFiles',
   'bookCovers',
   'epubLocations',
+  'readingMarks',
 ] as const
 type Database = Awaited<ReturnType<typeof openReaderDatabase>>
 type Transaction = ReturnType<Database['transaction']>
@@ -54,6 +56,8 @@ async function localFields(tx: Transaction): Promise<Record<string, Json>> {
     if (settings)
       for (const [field, value] of Object.entries(settings.settings))
         fields[key + 'setting' + field] = value
+    const marks = await tx.objectStore('readingMarks').get(b.id)
+    if (marks) fields[key + 'marks'] = json(marks)
   }
   const app = await tx.objectStore('preferences').get('app')
   if (app) {
@@ -180,6 +184,51 @@ function validateProgress(value: Json, book: BookMetadata): ReadingProgress {
     throw new Error('備份閱讀位置無效。')
   return { bookId: book.id, location: p.location, percentage: p.percentage, updatedAt: p.updatedAt }
 }
+function validLocation(value: unknown, format: BookMetadata['format']) {
+  if (!value || typeof value !== 'object') return false
+  const location = value as ReadingProgress['location']
+  return (
+    location.format === format &&
+    ((location.format === 'epub' &&
+      typeof location.cfi === 'string' &&
+      location.cfi.startsWith('epubcfi(')) ||
+      (location.format === 'txt' &&
+        Number.isSafeInteger(location.characterOffset) &&
+        location.characterOffset >= 0) ||
+      (location.format === 'pdf' && Number.isSafeInteger(location.page) && location.page >= 1))
+  )
+}
+function validateMarks(value: Json, book: BookMetadata): ReadingMarks {
+  const marks = value as unknown as ReadingMarks
+  const validItem = (item: ReadingMarks['bookmarks'][number] | ReadingMarks['trail'][number]) =>
+    !!item &&
+    typeof item.id === 'string' &&
+    typeof item.label === 'string' &&
+    item.label.length <= 200 &&
+    Number.isFinite(item.percentage) &&
+    item.percentage >= 0 &&
+    item.percentage <= 1 &&
+    Number.isFinite(item.createdAt) &&
+    validLocation(item.location, book.format)
+  if (
+    !marks ||
+    !Array.isArray(marks.bookmarks) ||
+    !Array.isArray(marks.trail) ||
+    marks.bookmarks.length > 1000 ||
+    marks.trail.length > 20 ||
+    !Number.isFinite(marks.updatedAt) ||
+    !marks.bookmarks.every(
+      (item) =>
+        validItem(item) &&
+        Number.isFinite(item.updatedAt) &&
+        (item.excerpt === undefined ||
+          (typeof item.excerpt === 'string' && item.excerpt.length <= 500)),
+    ) ||
+    !marks.trail.every(validItem)
+  )
+    throw new Error('備份書籤資料無效。')
+  return marks
+}
 // Re-read local state inside the same write transaction that applies the merge.
 // Changes made while a network request was in flight therefore cannot be overwritten.
 export async function applyRemote(
@@ -219,6 +268,7 @@ export async function applyRemote(
             'bookFiles',
             'bookCovers',
             'epubLocations',
+            'readingMarks',
           ] as const)
             await tx.objectStore(name).delete(previous.id)
         continue
@@ -236,6 +286,9 @@ export async function applyRemote(
       if (settings)
         await tx.objectStore('readerSettings').put({ settings, updatedAt: Date.now() }, book.id)
       else await tx.objectStore('readerSettings').delete(book.id)
+      const marks = fields[hash + '/marks']
+      if (marks) await tx.objectStore('readingMarks').put(validateMarks(marks, book), book.id)
+      else if (marks === null) await tx.objectStore('readingMarks').delete(book.id)
     }
     if (fields['app/theme']) {
       const readingDefaults = settingsFromFields(fields, 'app/default')

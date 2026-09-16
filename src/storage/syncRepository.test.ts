@@ -1,6 +1,12 @@
 import { afterEach, expect, it } from 'vitest'
 import { deleteDB } from 'idb'
-import { DATABASE_NAME, openReaderDatabase, readPreferences, writePreferences } from './database'
+import {
+  DATABASE_NAME,
+  DATABASE_VERSION,
+  openReaderDatabase,
+  readPreferences,
+  writePreferences,
+} from './database'
 import { applyRemote, captureLocal, storeDownloaded } from './syncRepository'
 import {
   getBookFile,
@@ -14,6 +20,7 @@ import { writeReadingSettings, readReadingSettings } from './readingSettingsRepo
 import { defaultReadingSettings } from '../features/reader/readingSettings'
 import { conflicts, emptyDocument, materialize, writeFields } from '../features/cloud/syncModel'
 import type { BookMetadata } from '../domain/book'
+import { addBookmark, readReadingMarks } from './readingMarksRepository'
 
 const id = 'a'.repeat(64)
 const book: BookMetadata = {
@@ -43,6 +50,11 @@ it('restores an empty device with metadata, progress, defaults, theme and per-bo
     updatedAt: 2,
   })
   await writeReadingSettings(id, { ...defaultReadingSettings, fontSize: 27 })
+  await addBookmark(id, {
+    location: { format: 'txt', characterOffset: 2 },
+    percentage: 0.68,
+    label: '第一章',
+  })
   await writePreferences({
     theme: 'graphite',
     librarySort: 'title',
@@ -68,6 +80,10 @@ it('restores an empty device with metadata, progress, defaults, theme and per-bo
   expect(await getBookFile(id)).toBeUndefined()
   expect((await readProgress(id))?.percentage).toBe(0.68)
   expect((await readReadingSettings(id, 'paper')).fontSize).toBe(27)
+  expect((await readReadingMarks(id)).bookmarks[0]).toMatchObject({
+    percentage: 0.68,
+    label: '第一章',
+  })
   expect(await readPreferences()).toMatchObject({
     theme: 'graphite',
     librarySort: 'title',
@@ -123,7 +139,7 @@ it('rejects changed original bytes before committing to IndexedDB', async () => 
 })
 it('migrates a v5 shelf without deleting original files', async () => {
   const db = await openReaderDatabase()
-  expect(db.version).toBe(6)
+  expect(db.version).toBe(DATABASE_VERSION)
   expect(db.objectStoreNames.contains('syncState')).toBe(true)
   db.close()
 })

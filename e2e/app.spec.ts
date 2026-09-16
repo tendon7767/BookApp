@@ -50,14 +50,10 @@ test('cached app reopens when the origin server is completely stopped', async ({
   if (!address || typeof address === 'string') throw new Error('Preview server address unavailable')
   const url = `http://localhost:${address.port}/BookApp/`
   let stopped = false
-  const stop = () =>
-    new Promise<void>((resolve, reject) => {
-      if ('closeAllConnections' in server.httpServer) server.httpServer.closeAllConnections()
-      server.httpServer.close((error) => {
-        if (error) reject(error)
-        else resolve()
-      })
-    })
+  const stop = async () => {
+    if ('closeAllConnections' in server.httpServer) server.httpServer.closeAllConnections()
+    await server.close()
+  }
   try {
     await page.goto(url)
     await expect(page.getByText('可離線開啟 · 書籍需先下載')).toBeVisible()
