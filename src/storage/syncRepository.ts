@@ -63,6 +63,7 @@ async function localFields(tx: Transaction): Promise<Record<string, Json>> {
   if (app) {
     fields['app/theme'] = app.theme
     if (app.librarySort) fields['app/librarySort'] = app.librarySort
+    if (app.seriesSort) fields['app/seriesSort'] = app.seriesSort
     if (app.readingDefaults)
       for (const [field, value] of Object.entries(app.readingDefaults))
         fields['app/default' + field] = value
@@ -296,6 +297,7 @@ export async function applyRemote(
         parsePreferences({
           theme: fields['app/theme'],
           librarySort: fields['app/librarySort'],
+          seriesSort: fields['app/seriesSort'],
           ...(readingDefaults ? { readingDefaults } : {}),
         }),
         'app',

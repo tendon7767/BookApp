@@ -11,7 +11,8 @@ import { assignSeries } from '../../storage/seriesRepository'
 import type { SeriesAssignment } from '../../domain/series'
 import { importBook } from '../import/importBook'
 import { defaultLibraryFilter } from './libraryView'
-import { readPreferences, writeLibrarySort } from '../../storage/database'
+import type { SeriesSort } from './seriesView'
+import { readPreferences, writeShelfSort } from '../../storage/database'
 
 export interface ImportNotice {
   name: string
@@ -24,6 +25,7 @@ export function useLibrary() {
   const [books, setBooks] = useState<LibraryBook[]>([])
   const [activeSeries, setActiveSeries] = useState<string | null>(null)
   const [filter, setFilterState] = useState(defaultLibraryFilter)
+  const [seriesSort, setSeriesSortState] = useState<SeriesSort>('volume')
   const revision = useRef(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -53,15 +55,18 @@ export function useLibrary() {
       if (!importing.current) void reload()
     }
     window.addEventListener('focus', onFocus)
+    const applyPreferences = () =>
+      readPreferences()
+        .then((p) => {
+          setFilterState((current) => ({ ...current, sort: p.librarySort ?? 'recent' }))
+          setSeriesSortState(p.seriesSort ?? 'volume')
+        })
+        .catch(() => undefined)
     const restore = () => {
       void reload()
-      void readPreferences()
-        .then((p) => setFilterState((current) => ({ ...current, sort: p.librarySort ?? 'recent' })))
-        .catch(() => undefined)
+      void applyPreferences()
     }
-    void readPreferences()
-      .then((p) => setFilterState((current) => ({ ...current, sort: p.librarySort ?? 'recent' })))
-      .catch(() => undefined)
+    void applyPreferences()
     window.addEventListener('kanshu-restored', restore)
     return () => {
       window.removeEventListener('focus', onFocus)
@@ -70,10 +75,16 @@ export function useLibrary() {
   }, [reload])
   function setFilter(value: typeof filter) {
     setFilterState(value)
-    if (value.sort !== filter.sort)
-      void writeLibrarySort(value.sort)
-        .then(() => window.dispatchEvent(new Event('kanshu-restored')))
-        .catch(() => setError('無法保存排序設定。'))
+    if (value.sort !== filter.sort) void persistSort({ librarySort: value.sort })
+  }
+  function setSeriesSort(value: SeriesSort) {
+    setSeriesSortState(value)
+    void persistSort({ seriesSort: value })
+  }
+  function persistSort(patch: Parameters<typeof writeShelfSort>[0]) {
+    return writeShelfSort(patch)
+      .then(() => window.dispatchEvent(new Event('kanshu-restored')))
+      .catch(() => setError('無法保存排序設定。'))
   }
 
   async function importFiles(files: File[]) {
@@ -164,6 +175,8 @@ export function useLibrary() {
     bulkSeries,
     filter,
     setFilter,
+    seriesSort,
+    setSeriesSort,
     editBook,
     bulkCategory,
     bulkRemove,

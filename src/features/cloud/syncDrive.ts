@@ -60,6 +60,58 @@ export class SyncDrive extends DriveClient {
     } while (pageToken)
     return result
   }
+  private async patch(id: string, body: unknown, query: string, signal: AbortSignal) {
+    return (
+      await this.send(
+        API + `files/${encodeURIComponent(id)}?fields=${encodeURIComponent(fields)}${query}`,
+        signal,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      )
+    ).json() as Promise<RemoteEntry>
+  }
+  // Deletes are never permanent: Google Drive keeps a trashed file recoverable.
+  async trash(id: string, signal: AbortSignal) {
+    try {
+      await this.patch(id, { trashed: true }, '', signal)
+    } catch (error) {
+      if (!(error instanceof DriveError && error.status === 404)) throw error
+    }
+  }
+  async move(id: string, from: string, to: string, signal: AbortSignal) {
+    if (from === to) return
+    await this.patch(
+      id,
+      {},
+      `&addParents=${encodeURIComponent(to)}&removeParents=${encodeURIComponent(from)}`,
+      signal,
+    )
+  }
+  async mark(id: string, appProperties: Record<string, string>, signal: AbortSignal) {
+    return this.patch(id, { appProperties }, '', signal)
+  }
+  async createFolder(
+    parent: string,
+    name: string,
+    appProperties: Record<string, string>,
+    signal: AbortSignal,
+  ) {
+    return (
+      await this.send(API + 'files?fields=' + encodeURIComponent(fields), signal, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: [parent],
+          appProperties,
+        }),
+      })
+    ).json() as Promise<RemoteEntry>
+  }
   async folder(parent: string, signal: AbortSignal) {
     const selected = await this.entry(parent, signal)
     if (
@@ -74,18 +126,7 @@ export class SyncDrive extends DriveClient {
     if (folders.length > 1)
       throw new Error('此處有多份「看書」備份，請直接選擇要使用的「看書」子資料夾。')
     if (folders[0]) return folders[0]
-    return (
-      await this.send(API + 'files?fields=' + encodeURIComponent(fields), signal, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: '看書',
-          mimeType: 'application/vnd.google-apps.folder',
-          parents: [parent],
-          appProperties: { kanshu: 'library-v1' },
-        }),
-      })
-    ).json() as Promise<RemoteEntry>
+    return this.createFolder(parent, '看書', { kanshu: 'library-v1' }, signal)
   }
   async generateId(signal: AbortSignal): Promise<string> {
     const data = await (

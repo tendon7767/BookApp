@@ -171,6 +171,26 @@ export function TypographyPanel({
             上下
           </button>
         </div>
+        <div className={`tap-zone-map tap-zone-map-${settings.tapZones}`} aria-hidden="true">
+          <span>上一頁</span>
+          <span>選單</span>
+          <span>下一頁</span>
+        </div>
+        <div className="tap-zone-options" role="group" aria-label="翻頁效果">
+          <span>翻頁效果</span>
+          <button
+            aria-pressed={settings.pageAnimation === 'slide'}
+            onClick={() => change({ pageAnimation: 'slide' })}
+          >
+            滑動
+          </button>
+          <button
+            aria-pressed={settings.pageAnimation === 'none'}
+            onClick={() => change({ pageAnimation: 'none' })}
+          >
+            關閉
+          </button>
+        </div>
         <div className="custom-colors">
           <label>
             文字色

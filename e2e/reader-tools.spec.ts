@@ -13,7 +13,7 @@ test('TXT search, bookmarks, jump history and vertical tap zones persist content
   })
   await expect(page.getByText('1 本書', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '關閉匯入結果' }).click()
-  await page.getByRole('button', { name: '開啟 工具測試', exact: true }).click()
+  await page.getByRole('button', { name: '書籍資訊 工具測試', exact: true }).click()
   await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
   const menu = page.getByRole('button', { name: '閱讀選單', exact: true })
   await expect(menu).toBeVisible()

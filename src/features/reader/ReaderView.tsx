@@ -20,6 +20,7 @@ import {
 } from '../../storage/readingMarksRepository'
 import { TocDialog } from './TocDialog'
 import { ReaderGestures } from './ReaderGestures'
+import { TapZoneHint } from './TapZoneHint'
 import { TypographyPanel } from './TypographyPanel'
 import { readingColors, type ReadingSettings } from './readingSettings'
 import type { TocEntry } from './TocDialog'
@@ -68,6 +69,16 @@ export function ReaderView({
   const [closing, setClosing] = useState(false)
   const [exitError, setExitError] = useState(false)
   const [slider, setSlider] = useState<number | null>(null)
+  const [hint, setHint] = useState(() => {
+    try {
+      return localStorage.getItem('kanshu-zone-hint') !== null
+        ? localStorage.getItem('kanshu-zone-hint') !== reader.readingSettings.tapZones
+        : true
+    } catch {
+      return false
+    }
+  })
+  const [flip, setFlip] = useState<{ gesture: 'next' | 'previous'; count: number } | null>(null)
   const seekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const setReaderNotice = reader.setNotice
   useEffect(() => () => clearTimeout(seekTimer.current), [])
@@ -82,6 +93,32 @@ export function ReaderView({
       active = false
     }
   }, [book.id, setReaderNotice])
+  const zones = reader.readingSettings.tapZones
+  // The hint waits for the first rendered page, then fades on its own.
+  useEffect(() => {
+    if (!hint || !reader.ready) return
+    try {
+      localStorage.setItem('kanshu-zone-hint', zones)
+    } catch {
+      /* private mode simply shows the hint again next time */
+    }
+    const timer = setTimeout(() => setHint(false), 1800)
+    return () => clearTimeout(timer)
+  }, [hint, reader.ready, zones])
+  function updateSettings(next: ReadingSettings) {
+    if (next.tapZones !== zones) setHint(true)
+    reader.updateSettings(next)
+  }
+  // The turn animation plays on the page that just arrived, so it waits for the engine.
+  function act(gesture: 'next' | 'previous' | 'toggle') {
+    const result = reader.act(gesture)
+    if (gesture === 'toggle' || reader.readingSettings.pageAnimation === 'none')
+      return void Promise.resolve(result)
+    void Promise.resolve(result).then(() =>
+      setFlip((previous) => ({ gesture, count: (previous?.count ?? 0) + 1 })),
+    )
+  }
+  const flipOffset = flip?.gesture === 'previous' ? '-24px' : '24px'
   const percentage = reader.position?.percentage
   const label = percentage == null ? '計算進度中…' : `${Math.round(percentage * 100)}%`
   const colors = readingColors(reader.readingSettings)
@@ -141,18 +178,24 @@ export function ReaderView({
           return
         if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
           event.preventDefault()
-          void reader.act(event.key === 'ArrowRight' ? 'next' : 'previous')
+          act(event.key === 'ArrowRight' ? 'next' : 'previous')
         }
         if (event.key === 'Escape') reader.setControls(!reader.controls)
       }}
     >
-      {children}
-      {reader.ready && (
-        <ReaderGestures
-          tapZones={reader.readingSettings.tapZones}
-          onGesture={(gesture) => void reader.act(gesture)}
-        />
-      )}
+      <div
+        className={`reader-page${flip ? ` reader-flip-${flip.count % 2 ? 'a' : 'b'}` : ''}`}
+        style={
+          {
+            '--flip-dx': zones === 'vertical' ? '0px' : flipOffset,
+            '--flip-dy': zones === 'vertical' ? flipOffset : '0px',
+          } as CSSProperties
+        }
+      >
+        {children}
+      </div>
+      {reader.ready && <ReaderGestures tapZones={zones} onGesture={act} />}
+      {hint && reader.ready && <TapZoneHint tapZones={zones} />}
       {!reader.ready && (
         <div className="reader-loading" role={reader.error ? 'alert' : 'status'}>
           {reader.error || '正在開書…'}
@@ -206,7 +249,7 @@ export function ReaderView({
           </div>
           <div className="reader-actions">
             <button
-              onClick={() => void reader.act('previous')}
+              onClick={() => act('previous')}
               disabled={reader.busy || reader.position?.atStart}
             >
               <ChevronLeft size={20} />
@@ -238,10 +281,7 @@ export function ReaderView({
             <button aria-label="閱讀排版" onClick={() => setTypographyOpen(true)}>
               <span className="aa-label">Aa</span>
             </button>
-            <button
-              onClick={() => void reader.act('next')}
-              disabled={reader.busy || reader.position?.atEnd}
-            >
+            <button onClick={() => act('next')} disabled={reader.busy || reader.position?.atEnd}>
               下一頁
               <ChevronRight size={20} />
             </button>
@@ -260,10 +300,9 @@ export function ReaderView({
             </button>
           )}
           {extraControls}
-          <p className="reader-hint">
-            {reader.readingSettings.tapZones === 'vertical' ? '上下點按' : '左右點按'} ·
-            左右滑動翻頁 · 點中央開關選單
-          </p>
+          <button className="reader-hint" aria-label="顯示點按區域" onClick={() => setHint(true)}>
+            {zones === 'vertical' ? '上下點按' : '左右點按'} · 左右滑動翻頁 · 點中央開關選單
+          </button>
         </footer>
       )}
       {(reader.notice || reader.saveError || reader.settingsError || exitError) && (
@@ -315,7 +354,7 @@ export function ReaderView({
       {typographyOpen && (
         <TypographyPanel
           settings={reader.readingSettings}
-          onChange={reader.updateSettings}
+          onChange={updateSettings}
           onClose={() => setTypographyOpen(false)}
           savingError={reader.settingsError}
         />

@@ -118,6 +118,24 @@ function driveMock() {
       }
       const entry = entries.get(id)
       if (!entry) return route.fulfill({ status: 404, body: '{}' })
+      if (req.method() === 'PATCH') {
+        const body = req.postDataJSON() as {
+          trashed?: boolean
+          appProperties?: Entry['appProperties']
+        }
+        const add = url.searchParams.get('addParents')
+        const remove = url.searchParams.get('removeParents')
+        const next: Entry = {
+          ...entry,
+          ...(body.appProperties ? { appProperties: body.appProperties } : {}),
+          parents: add
+            ? [...(entry.parents ?? []).filter((p) => p !== remove), add]
+            : entry.parents,
+        }
+        if (body.trashed) entries.delete(id)
+        else entries.set(id, next)
+        return route.fulfill({ json: next })
+      }
       if (url.searchParams.get('alt') === 'media') {
         if (entry.appProperties?.kanshu === 'book-v1') downloads++
         return route.fulfill({
@@ -222,11 +240,39 @@ test('App imports back up into a selected folder and a fresh device restores the
   expect(
     [...fake.entries.values()].filter((e) => e.appProperties?.kanshu === 'book-v1'),
   ).toHaveLength(2)
+  // Book originals stay in the shelf folder; backups live in its data subfolder.
+  const data = [...fake.entries.values()].find((e) => e.appProperties?.kanshu === 'data-v1')!
+  expect(data.parents).toEqual([folder.id])
+  expect(
+    [...fake.entries.values()]
+      .filter((e) => e.appProperties?.kanshu === 'book-v1')
+      .every((e) => e.parents?.[0] === folder.id),
+  ).toBe(true)
   expect(
     [...fake.entries.values()]
       .filter((e) => e.appProperties?.kanshu === 'snapshot-v1')
-      .every((e) => e.parents?.[0] === folder.id),
+      .every((e) => e.parents?.[0] === data.id),
   ).toBe(true)
+  // A book dropped into the shelf folder is found, imported and adopted as its own original.
+  const dropped = Buffer.from('第一章\n手動放進資料夾的書。\n'.repeat(50))
+  fake.entries.set('dropped', {
+    id: 'dropped',
+    name: '手動放的書.txt',
+    mimeType: 'text/plain',
+    size: String(dropped.length),
+    parents: [folder.id],
+  })
+  fake.bodies.set('dropped', dropped)
+  await page.getByRole('button', { name: '查詢雲端新書', exact: true }).click()
+  await expect(page.getByText('找到 1 個尚未加入的檔案。')).toBeVisible()
+  await page.getByRole('checkbox', { name: /手動放的書/ }).check()
+  await page.getByRole('button', { name: '加入所選 (1)', exact: true }).click()
+  await expect(page.getByText(/手動放的書.txt：已加入書架/)).toBeVisible()
+  expect(fake.entries.get('dropped')!.appProperties?.kanshu).toBe('book-v1')
+  await sync(page)
+  expect(
+    [...fake.entries.values()].filter((e) => e.appProperties?.kanshu === 'book-v1'),
+  ).toHaveLength(3)
   // All metadata writes use normal repositories in production; inspect their backup after a UI theme edit.
   await page.getByRole('button', { name: '返回書架', exact: true }).click()
   await page.getByRole('button', { name: '設定', exact: true }).click()
@@ -275,28 +321,30 @@ test('App imports back up into a selected folder and a fresh device restores the
     await sync(page)
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'sage')
     await p.getByRole('button', { name: '返回書架', exact: true }).click()
-    await expect(p.getByText('2 本書', { exact: true })).toBeVisible()
-    await p.getByRole('button', { name: '開啟 雲端小說', exact: true }).click()
+    await expect(p.getByText('3 本書', { exact: true })).toBeVisible()
+    await p.getByRole('button', { name: '書籍資訊 雲端小說', exact: true }).click()
     await expect(p.getByRole('button', { name: '下載並閱讀', exact: true })).toBeVisible()
     fake.corrupt(true)
     await p.getByRole('button', { name: '下載並閱讀', exact: true }).click()
     await expect(p.getByRole('alert')).toContainText('大小與備份不符')
     fake.corrupt(false)
     await p.getByRole('button', { name: '返回書架', exact: true }).click()
-    await p.getByRole('button', { name: '開啟 雲端小說', exact: true }).click()
+    await p.getByRole('button', { name: '書籍資訊 雲端小說', exact: true }).click()
     await p.getByRole('button', { name: '下載並閱讀', exact: true }).click()
     await expect(p.getByRole('button', { name: '閱讀選單', exact: true })).toBeVisible()
     // Exit and remove only downloaded bytes; progress and shelf remain.
     await p.getByRole('button', { name: '閱讀選單', exact: true }).click()
     await p.getByRole('button', { name: '返回書架', exact: true }).click()
-    await p.getByRole('button', { name: '開啟 雲端小說', exact: true }).click()
+    await p.getByRole('button', { name: '書籍資訊 雲端小說', exact: true }).click()
     await expect(p.getByRole('button', { name: '開始閱讀', exact: true })).toBeVisible()
-    await p.getByRole('button', { name: '僅移除本機下載（保留進度）', exact: true }).click()
-    await p.getByRole('button', { name: '開啟 雲端小說', exact: true }).click()
+    await p.getByRole('button', { name: '刪除書籍', exact: true }).click()
+    await p.getByRole('radio', { name: /只移除本機下載/ }).check()
+    await p.getByRole('button', { name: '移除 1 本的下載', exact: true }).click()
+    await p.getByRole('button', { name: '書籍資訊 雲端小說', exact: true }).click()
     await expect(p.getByRole('button', { name: '下載並閱讀', exact: true })).toBeVisible()
-    await p.getByRole('button', { name: '從書架刪除', exact: true }).click()
+    await p.getByRole('button', { name: '刪除書籍', exact: true }).click()
     await p.getByRole('button', { name: '確認刪除 1 本', exact: true }).click()
-    await expect(p.getByText('1 本書', { exact: true })).toBeVisible()
+    await expect(p.getByText('2 本書', { exact: true })).toBeVisible()
     await cloudScreen(p)
     await sync(p)
     await expect(p.getByText('找回已刪除書籍（1）', { exact: true })).toBeVisible()

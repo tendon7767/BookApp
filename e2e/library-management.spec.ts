@@ -12,7 +12,7 @@ test('edits, searches, filters and resumes recently read books without losing pr
     })),
   )
   await expect(page.getByText('3 本書', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '開啟 故事2', exact: true }).click()
+  await page.getByRole('button', { name: '書籍資訊 故事2', exact: true }).click()
   await page.getByRole('button', { name: '編輯書籍資訊', exact: true }).click()
   await page.getByRole('textbox', { name: '書名', exact: true }).fill('  山城夜讀  ')
   await page.getByRole('textbox', { name: '作者', exact: true }).fill('測試作者')
@@ -24,7 +24,7 @@ test('edits, searches, filters and resumes recently read books without losing pr
   const search = page.getByRole('searchbox', { name: '搜尋書籍' })
   await search.fill('故事2 測試作者')
   await expect(page.getByText('找到 1 本書')).toBeVisible()
-  const card = page.getByRole('button', { name: '開啟 山城夜讀', exact: true })
+  const card = page.getByRole('button', { name: '書籍資訊 山城夜讀', exact: true })
   await expect(card.locator('.book-cover-progress')).toHaveAttribute('aria-label', '尚未閱讀')
   await page.getByRole('combobox', { name: '分類篩選' }).selectOption('category:小說')
   await card.click()
@@ -39,9 +39,15 @@ test('edits, searches, filters and resumes recently read books without losing pr
   await expect(card.locator('.book-cover-progress')).toHaveAttribute('aria-label', '已讀 68%')
   await page.getByRole('button', { name: '清除搜尋', exact: true }).click()
   await page.getByRole('combobox', { name: '分類篩選' }).selectOption('all')
-  await expect(page.locator('.book-card').first()).toHaveAttribute('aria-label', '開啟 山城夜讀')
+  await expect(page.locator('.book-card').first()).toHaveAttribute(
+    'aria-label',
+    '書籍資訊 山城夜讀',
+  )
   await page.reload()
-  await expect(page.locator('.book-card').first()).toHaveAttribute('aria-label', '開啟 山城夜讀')
+  await expect(page.locator('.book-card').first()).toHaveAttribute(
+    'aria-label',
+    '書籍資訊 山城夜讀',
+  )
   await expect(card.locator('.book-cover-progress')).toHaveAttribute('aria-label', '已讀 68%')
   await search.fill('找不到的書')
   await expect(page.getByText('沒有符合的書籍', { exact: true })).toBeVisible()
@@ -49,7 +55,7 @@ test('edits, searches, filters and resumes recently read books without losing pr
   await page.getByRole('combobox', { name: '分類篩選' }).selectOption('uncategorized')
   await expect(page.locator('.book-card')).toHaveCount(2)
   await page.getByRole('combobox', { name: '分類篩選' }).selectOption('category:小說')
-  await page.getByRole('button', { name: '開啟 山城夜讀', exact: true }).click()
+  await page.getByRole('button', { name: '書籍資訊 山城夜讀', exact: true }).click()
   await expect(page.getByRole('dialog')).toContainText('上次閱讀：')
   await page.getByRole('button', { name: '編輯書籍資訊', exact: true }).click()
   await page.getByLabel('分類', { exact: true }).fill('')
@@ -75,7 +81,7 @@ test('blank names are rejected and a failed save keeps editable values for retry
     mimeType: 'text/plain',
     buffer: Buffer.from('第一章\n離線也能看書。'),
   })
-  await page.getByRole('button', { name: '開啟 原書名', exact: true }).click()
+  await page.getByRole('button', { name: '書籍資訊 原書名', exact: true }).click()
   await page.getByRole('button', { name: '編輯書籍資訊', exact: true }).click()
   const title = page.getByRole('textbox', { name: '書名', exact: true })
   await title.fill('   ')
@@ -95,9 +101,9 @@ test('blank names are rejected and a failed save keeps editable values for retry
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(title).toHaveValue('新的書名')
   await expect(
-    page.getByRole('button', { name: '開啟 原書名', exact: true, includeHidden: true }),
+    page.getByRole('button', { name: '書籍資訊 原書名', exact: true, includeHidden: true }),
   ).toBeAttached()
   await page.getByRole('button', { name: '儲存變更', exact: true }).click()
   await page.getByRole('button', { name: '關閉書籍資訊', exact: true }).click()
-  await expect(page.getByRole('button', { name: '開啟 新的書名', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '書籍資訊 新的書名', exact: true })).toBeVisible()
 })

@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { makeEpub } from '../tests/fixtures/epub.ts'
 
 async function openBook(page: Page, title: string) {
-  await page.getByRole('button', { name: `開啟 ${title}`, exact: true }).click()
+  await page.getByRole('button', { name: `書籍資訊 ${title}`, exact: true }).click()
   await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
   await page.getByRole('button', { name: '閱讀選單', exact: true }).click()
 }
