@@ -19,7 +19,9 @@ test('edits, searches, filters and resumes recently read books without losing pr
   await page.getByLabel('分類', { exact: true }).fill('小說')
   await page.getByRole('button', { name: '儲存變更', exact: true }).click()
   await expect(page.getByRole('dialog')).toContainText('山城夜讀')
-  await expect(page.getByRole('dialog')).toContainText('原始檔案：故事2.txt')
+  // The file name now lives in the collapsible details block.
+  await page.getByText('原始檔案', { exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('故事2.txt')
   await page.getByRole('button', { name: '關閉書籍資訊', exact: true }).click()
   const search = page.getByRole('searchbox', { name: '搜尋書籍' })
   await search.fill('故事2 測試作者')
@@ -56,7 +58,9 @@ test('edits, searches, filters and resumes recently read books without losing pr
   await expect(page.locator('.book-card')).toHaveCount(2)
   await page.getByRole('combobox', { name: '分類篩選' }).selectOption('category:小說')
   await page.getByRole('button', { name: '書籍資訊 山城夜讀', exact: true }).click()
-  await expect(page.getByRole('dialog')).toContainText('上次閱讀：')
+  // The progress row now carries the percentage and the timestamp.
+  await expect(page.getByRole('dialog')).toContainText('已讀 68%')
+  await expect(page.getByRole('dialog').locator('time')).toBeVisible()
   await page.getByRole('button', { name: '編輯書籍資訊', exact: true }).click()
   await page.getByLabel('分類', { exact: true }).fill('')
   await page.getByRole('button', { name: '儲存變更', exact: true }).click()

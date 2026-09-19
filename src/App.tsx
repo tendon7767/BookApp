@@ -1,6 +1,6 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { BookMetadata } from './domain/book'
-import { ArrowLeft, BookOpen, Check, Download, LibraryBig, Settings2, WifiOff } from 'lucide-react'
+import { ArrowLeft, BookOpen, Cloud, CloudOff, Download, LibraryBig, Settings2 } from 'lucide-react'
 import { InstallDialog } from './components/InstallDialog'
 import { LibraryScreen } from './features/library/LibraryScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
@@ -26,6 +26,10 @@ export default function App() {
     status.online,
     library.reload,
   )
+  // The offline state is no longer shown on the shelf; expose it for diagnostics and tests.
+  useEffect(() => {
+    document.documentElement.dataset.offline = status.offlineState
+  }, [status.offlineState])
   function navigate(next: typeof screen) {
     setScreen(next)
     window.scrollTo({ top: 0 })
@@ -81,35 +85,31 @@ export default function App() {
           <span>看書</span>
         </a>
         <div className="header-actions">
-          {cloud.target ? (
-            <button
-              className="connection-status cloud-status-button"
-              aria-label="雲端同步狀態"
-              onClick={() => navigate('cloud')}
-            >
-              <span className="status-dot" />
-              <span>
-                {!status.online
-                  ? '離線中'
+          {/* The header chip is the way into Google Drive, so it names the cloud. */}
+          <button
+            className="connection-status cloud-status-button"
+            aria-label="雲端同步"
+            onClick={() => navigate('cloud')}
+          >
+            {status.online ? <Cloud size={15} /> : <CloudOff size={15} />}
+            <span>
+              {!status.online
+                ? '雲端離線'
+                : !cloud.target
+                  ? '雲端未設定'
                   : cloud.busy
-                    ? '同步中'
+                    ? '雲端同步中'
                     : !cloud.connected
-                      ? '待連接'
+                      ? '雲端待連接'
                       : cloud.error
-                        ? '同步異常'
+                        ? '雲端異常'
                         : cloud.conflicts.length
-                          ? '待處理'
+                          ? '雲端待處理'
                           : cloud.pendingCount || !cloud.state?.lastSync
-                            ? '待同步'
-                            : '已同步'}
-              </span>
-            </button>
-          ) : (
-            <div className="connection-status" role="status">
-              {status.online ? <span className="status-dot" /> : <WifiOff size={13} />}
-              <span>{status.online ? '已連線' : '離線中'}</span>
-            </div>
-          )}
+                            ? '雲端待同步'
+                            : '雲端已同步'}
+            </span>
+          </button>
           <button
             className="icon-button"
             aria-label={screen === 'library' ? '設定' : '書架'}
@@ -157,23 +157,6 @@ export default function App() {
         {screen === 'library' && settings.storageError && (
           <p className="inline-warning" role="alert">
             {settings.storageError}
-          </p>
-        )}
-        {screen === 'library' && (
-          <p className="offline-caption" role="status">
-            {status.offlineState === 'ready' ? (
-              <>
-                <Check size={13} /> 可離線開啟 · 書籍需先下載
-              </>
-            ) : status.offlineState === 'development' ? (
-              '開發預覽 · 離線功能需正式建置'
-            ) : status.offlineState === 'unsupported' ? (
-              '此環境不支援離線啟動，請使用 HTTPS'
-            ) : status.offlineState === 'error' ? (
-              '離線準備失敗，請連線後重新開啟'
-            ) : (
-              '正在準備離線啟動…'
-            )}
           </p>
         )}
       </main>

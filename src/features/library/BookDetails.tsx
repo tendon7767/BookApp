@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Trash2, X } from 'lucide-react'
+import { Check, Cloud, Pencil, Trash2, X } from 'lucide-react'
 import type { BookEdits, LibraryBook } from '../../domain/book'
 import { BookCover } from './BookCover'
 import { BookMetadataForm } from './BookMetadataForm'
@@ -31,6 +31,7 @@ export function BookDetails({
   onRemove: (mode: RemoveMode) => Promise<void>
   onRead: () => void
 }) {
+  const readable = book.format === 'epub' || book.format === 'txt'
   const dialog = useRef<HTMLDialogElement>(null)
   const [confirming, setConfirming] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -88,13 +89,27 @@ export function BookDetails({
       <div className="sheet-body">
         <div className="sheet-handle" />
         {!editing && (
-          <button
-            className="icon-button delete-book-icon"
-            aria-label="刪除書籍"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 size={22} />
-          </button>
+          <div className="book-detail-tools">
+            <button
+              className="icon-button"
+              aria-label="刪除書籍"
+              onClick={() => setConfirming(true)}
+            >
+              <Trash2 size={22} />
+            </button>
+            <button
+              className="icon-button"
+              aria-label="編輯書籍資訊"
+              disabled={busy}
+              onClick={() => {
+                setEditing(true)
+                setConfirming(false)
+                setError(null)
+              }}
+            >
+              <Pencil size={21} />
+            </button>
+          </div>
         )}
         <button
           className="icon-button close-dialog"
@@ -104,11 +119,23 @@ export function BookDetails({
         >
           <X size={22} />
         </button>
-        {!editing && (
-          <div className="book-detail-cover">
-            <BookCover book={book} />
-          </div>
-        )}
+        {!editing &&
+          (readable ? (
+            <button
+              className="book-detail-cover book-detail-read"
+              aria-label={book.downloaded === false ? '下載並閱讀' : '開始閱讀'}
+              disabled={busy}
+              onClick={onRead}
+            >
+              <BookCover book={book} />
+              <span>{book.downloaded === false ? '點封面下載並閱讀' : '點封面開始閱讀'}</span>
+            </button>
+          ) : (
+            <div className="book-detail-cover">
+              <BookCover book={book} />
+              <span>此格式尚未支援閱讀</span>
+            </div>
+          ))}
         <h2 id="book-title">{book.title}</h2>
         {editing ? (
           <BookMetadataForm
@@ -124,62 +151,62 @@ export function BookDetails({
           />
         ) : (
           <>
-            <p>{book.author || '未提供作者'}</p>
-            {book.series && (
-              <p>
-                {book.series}
-                {book.volume != null ? ' · 第 ' + book.volume + ' 集' : ''}
-              </p>
-            )}
-            <p className="book-reading-status">
-              {book.category || '未分類'} · {progressLabel(book)}
-              {book.progress && (
+            <p className="book-detail-author">
+              {book.author || '未提供作者'}
+              {book.series && (
                 <>
-                  <br />
-                  <time dateTime={new Date(book.progress.updatedAt).toISOString()}>
-                    上次閱讀：
-                    {new Intl.DateTimeFormat('zh-TW', {
-                      month: 'numeric',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }).format(book.progress.updatedAt)}
-                  </time>
+                  {' · '}
+                  {book.series}
+                  {book.volume != null ? ' 第 ' + book.volume + ' 集' : ''}
                 </>
               )}
             </p>
+            <div className="book-detail-progress">
+              <span
+                className="book-detail-bar"
+                role="img"
+                aria-label={progressLabel(book)}
+                aria-hidden={book.progress ? undefined : true}
+              >
+                <span
+                  style={{
+                    width: `${Math.max(0, Math.min(100, (book.progress?.percentage ?? 0) * 100))}%`,
+                  }}
+                />
+              </span>
+              <strong>{progressLabel(book)}</strong>
+              {book.progress && (
+                <time dateTime={new Date(book.progress.updatedAt).toISOString()}>
+                  {new Intl.DateTimeFormat('zh-TW', {
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }).format(book.progress.updatedAt)}
+                </time>
+              )}
+            </div>
             <div className="book-facts">
+              <span>{book.category || '未分類'}</span>
               <span>{book.format.toUpperCase()}</span>
               <span>{formatFileSize(book.fileSize)}</span>
               <span>
-                <Check size={14} />{' '}
-                {book.downloaded === false ? '雲端書籍 · 尚未下載' : '已存於本機'}
+                {book.downloaded === false ? <Cloud size={14} /> : <Check size={14} />}
+                {book.downloaded === false ? '僅在雲端' : '已存於本機'}
               </span>
+              {book.cloudSource ? (
+                <span>
+                  <Cloud size={14} />
+                  已備份
+                </span>
+              ) : (
+                <span>尚未備份</span>
+              )}
             </div>
-            <p className="original-file">原始檔案：{book.fileName}</p>
-            <button
-              className="secondary-button full-width edit-book-button"
-              disabled={busy}
-              onClick={() => {
-                setEditing(true)
-                setConfirming(false)
-                setError(null)
-              }}
-            >
-              編輯書籍資訊
-            </button>
-            {book.format === 'epub' || book.format === 'txt' ? (
-              <button className="primary-button full-width" disabled={busy} onClick={onRead}>
-                {book.downloaded === false ? '下載並閱讀' : '開始閱讀'}
-              </button>
-            ) : (
-              <p className="book-stage-note">書籍已保存，此格式尚未支援閱讀。</p>
-            )}
-            <p className="quiet-note">
-              {book.cloudSource
-                ? '原檔已有雲端副本；最新設定的同步狀態請至設定查看。'
-                : '尚未備份原檔，請保留原始檔案。'}
-            </p>
+            <details className="book-detail-more">
+              <summary>原始檔案</summary>
+              <p className="original-file">{book.fileName}</p>
+            </details>
           </>
         )}
         {error && (

@@ -16,7 +16,7 @@ test('series can be assigned in bulk, searched, ordered, edited and read offline
   let stopped = false
   try {
     await page.goto(url)
-    await expect(page.getByText('可離線開啟 · 書籍需先下載')).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('data-offline', 'ready')
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true)
     await page.getByLabel('選擇書籍檔案').setInputFiles(
       ['序曲', '遠行', '番外', '散文'].map((name, i) => ({

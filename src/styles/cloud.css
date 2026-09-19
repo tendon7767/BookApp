@@ -159,6 +159,14 @@
 }
 .cloud-status-button {
   font-size: var(--text-meta);
+  gap: 6px;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.cloud-status-button svg {
+  flex-shrink: 0;
 }
 
 .cloud-candidate {

@@ -256,9 +256,6 @@ button.book-card-title:active {
   margin-top: 4px;
   white-space: nowrap;
 }
-.library-stage-note {
-  margin: 24px 0;
-}
 .library-filters {
   margin: 0 0 16px;
 }
@@ -343,19 +340,75 @@ button.book-card-title:active {
 .book-edit-form input {
   background: var(--bg);
 }
-.edit-book-button {
-  margin: 8px 0 12px;
-}
-.sheet-body > .book-reading-status {
-  font-size: var(--text-meta);
-  line-height: 1.8;
-  margin-top: 8px;
-}
-/* Sized from the viewport height so the reading button stays above the fold;
-   the width follows the 2 / 3 cover ratio. */
+/* Sized from the viewport height so the rest of the sheet stays above the fold;
+   the width follows the 2 / 3 cover ratio. Tapping the cover starts reading. */
 .book-detail-cover {
+  display: block;
   width: min(58%, 213px, calc(36dvh / 1.5));
-  margin: 6px auto 22px;
+  margin: 6px auto 14px;
+  padding: 0;
+  background: transparent;
+  text-align: center;
+}
+.book-detail-cover > span {
+  display: block;
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+.book-detail-read:active .book-cover {
+  filter: brightness(0.94);
+}
+.book-detail-tools {
+  position: absolute;
+  top: 17px;
+  left: 10px;
+  display: flex;
+  gap: 2px;
+}
+.book-detail-tools .icon-button:first-child {
+  color: #a04937;
+}
+.sheet-body > .book-detail-author {
+  font-size: var(--text-body);
+  line-height: 1.7;
+  margin: 0 0 14px;
+  overflow-wrap: anywhere;
+}
+.book-detail-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-size: var(--text-meta);
+  color: var(--muted);
+}
+.book-detail-bar {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+.book-detail-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.book-detail-progress strong {
+  color: var(--ink);
+  white-space: nowrap;
+}
+.book-detail-progress time {
+  white-space: nowrap;
+}
+.sheet-body > .book-detail-more {
+  margin: 0;
+}
+.book-detail-more summary {
+  color: var(--accent);
 }
 .book-dialog .sheet-body > h2 {
   overflow-wrap: anywhere;
@@ -367,16 +420,19 @@ button.book-card-title:active {
 }
 .book-facts {
   display: flex;
-  gap: 14px;
+  gap: 6px 10px;
   flex-wrap: wrap;
   font-size: var(--text-meta);
   color: var(--muted);
-  margin: 20px 0;
+  margin: 0 0 4px;
 }
 .book-facts > span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
 }
 .sheet-body > .original-file {
   font-size: var(--text-meta);
@@ -481,6 +537,8 @@ button.book-card-title:active {
 .series-sort {
   flex: 0 1 auto;
   max-width: 190px;
+  /* Lines up with the sort control in the tools bar above. */
+  margin-left: auto;
 }
 .library-summary {
   display: flex;
@@ -698,14 +756,13 @@ button.book-card-title:active {
   }
 }
 
-.delete-book-icon {
-  position: absolute;
-  top: 19px;
-  left: 12px;
-  color: #a04937;
-}
+/* The sheet scrolls, so the way out stays pinned to its bottom edge. */
 .book-back-button {
-  margin-top: 24px;
+  position: sticky;
+  bottom: 0;
+  margin-top: 20px;
+  background: var(--surface);
+  box-shadow: 0 -10px 12px 6px var(--surface);
 }
 .book-dialog-editing .sheet-body > h2 {
   padding-left: 0;

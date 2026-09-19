@@ -212,9 +212,6 @@ export function LibraryScreen({
               )
             })}
           </div>
-          <p className="quiet-note library-stage-note">
-            已下載的書籍可離線閱讀；備份狀態可在設定中查看。
-          </p>
         </>
       )}
       {seriesBooks && (

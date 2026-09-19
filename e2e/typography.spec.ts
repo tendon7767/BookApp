@@ -67,7 +67,7 @@ test('live typography preserves its anchor across repeated reflows and offline r
   page.on('pageerror', (e) => errors.push(e.message))
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('./')
-  await expect(page.getByText('可離線開啟 · 書籍需先下載')).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-offline', 'ready')
   await page.getByLabel('選擇書籍檔案').setInputFiles({
     name: 'layout.epub',
     mimeType: 'application/epub+zip',

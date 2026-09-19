@@ -122,7 +122,7 @@ test('imports an EPUB for the first time after the origin is stopped and retains
   let stopped = false
   try {
     await page.goto(url)
-    await expect(page.getByText('可離線開啟 · 書籍需先下載')).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('data-offline', 'ready')
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true)
     await stop()
     stopped = true

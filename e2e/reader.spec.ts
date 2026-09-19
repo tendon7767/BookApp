@@ -31,7 +31,7 @@ for (const version of ['2.0', '3.0'] as const) {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     await page.goto('./')
-    await expect(page.getByText('可離線開啟 · 書籍需先下載')).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('data-offline', 'ready')
     await page.getByLabel('選擇書籍檔案').setInputFiles({
       name: 'reading.epub',
       mimeType: 'application/epub+zip',
