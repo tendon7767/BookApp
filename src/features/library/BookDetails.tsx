@@ -189,7 +189,6 @@ export function BookDetails({
             <div className="book-facts">
               <span>{book.category || '未分類'}</span>
               <span>{book.format.toUpperCase()}</span>
-              <span>{formatFileSize(book.fileSize)}</span>
               <span>
                 {book.downloaded === false ? <Cloud size={14} /> : <Check size={14} />}
                 {book.downloaded === false ? '僅在雲端' : '已存於本機'}
@@ -206,6 +205,7 @@ export function BookDetails({
             <details className="book-detail-more">
               <summary>原始檔案</summary>
               <p className="original-file">{book.fileName}</p>
+              <p className="original-file">{formatFileSize(book.fileSize)}</p>
             </details>
           </>
         )}
