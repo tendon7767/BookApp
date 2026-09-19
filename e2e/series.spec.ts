@@ -1,5 +1,24 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { preview } from 'vite'
+
+async function storedSeriesSort(page: Page) {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('kanshu-local')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    try {
+      return await new Promise<string | undefined>((resolve, reject) => {
+        const request = database.transaction('preferences').objectStore('preferences').get('app')
+        request.onsuccess = () => resolve(request.result?.seriesSort)
+        request.onerror = () => reject(request.error)
+      })
+    } finally {
+      database.close()
+    }
+  })
+}
 
 test('series can be assigned in bulk, searched, ordered, edited and read offline', async ({
   page,
@@ -51,6 +70,7 @@ test('series can be assigned in bulk, searched, ordered, edited and read offline
     // The series page keeps its own sort, which survives a reload.
     await page.getByRole('combobox', { name: '系列排序' }).selectOption('volumeDesc')
     await expect(page.locator('.book-card-title')).toHaveText(['番外', '遠行', '序曲'])
+    await expect.poll(() => storedSeriesSort(page)).toBe('volumeDesc')
     await page.reload()
     await page.getByRole('button', { name: '開啟系列 山城故事', exact: true }).click()
     await expect(page.locator('.book-card-title')).toHaveText(['番外', '遠行', '序曲'])
@@ -66,7 +86,7 @@ test('series can be assigned in bulk, searched, ordered, edited and read offline
     await expect(page.getByLabel('系列', { exact: true })).toHaveValue('山城故事')
     await page.getByLabel('集數', { exact: true }).fill('1')
     await page.getByRole('button', { name: '儲存變更', exact: true }).click()
-    await page.getByRole('button', { name: '關閉書籍資訊', exact: true }).click()
+    await page.getByRole('button', { name: '返回書架', exact: true }).click()
     await stop()
     stopped = true
     await page.getByRole('button', { name: '書籍資訊 序曲', exact: true }).click()

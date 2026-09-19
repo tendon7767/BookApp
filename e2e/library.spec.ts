@@ -160,7 +160,7 @@ test('imports an EPUB for the first time after the origin is stopped and retains
     await reopened.getByRole('textbox', { name: '書名', exact: true }).fill('離線改名')
     await reopened.getByLabel('分類', { exact: true }).fill('離線收藏')
     await reopened.getByRole('button', { name: '儲存變更', exact: true }).click()
-    await reopened.getByRole('button', { name: '關閉書籍資訊', exact: true }).click()
+    await reopened.getByRole('button', { name: '返回書架', exact: true }).click()
     await reopened.reload()
     await reopened.getByRole('searchbox', { name: '搜尋書籍' }).fill('離線收藏')
     await expect(

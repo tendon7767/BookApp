@@ -362,47 +362,60 @@ button.book-card-title:active {
 .book-detail-tools {
   position: absolute;
   top: 17px;
-  left: 10px;
+  right: 12px;
   display: flex;
+  flex-direction: column;
   gap: 2px;
 }
 .book-detail-tools .icon-button:first-child {
   color: #a04937;
 }
-.sheet-body > .book-detail-author {
+.book-dialog .sheet-body > h2 .book-detail-author {
+  font-size: var(--text-body);
+  font-weight: 400;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sheet-body > .book-detail-series {
   font-size: var(--text-body);
   line-height: 1.7;
   margin: 0 0 14px;
   overflow-wrap: anywhere;
 }
 .book-detail-progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   margin: 0 0 12px;
   font-size: var(--text-meta);
   color: var(--muted);
 }
 .book-detail-bar {
-  flex: 1;
-  min-width: 0;
-  height: 6px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 30px;
   border-radius: 999px;
   background: var(--accent-soft);
   overflow: hidden;
 }
-.book-detail-bar > span {
-  display: block;
+.book-detail-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
 }
-.book-detail-progress strong {
+.book-detail-bar strong {
+  position: relative;
   color: var(--ink);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 1px 8px;
   white-space: nowrap;
 }
-.book-detail-progress time {
-  white-space: nowrap;
+.book-detail-last-read {
+  margin: 6px 0 0;
+  text-align: center;
 }
 .sheet-body > .book-detail-more {
   margin: 0;
@@ -415,8 +428,23 @@ button.book-card-title:active {
   padding-right: 0;
 }
 .book-dialog-editing .sheet-body > h2 {
-  padding-right: 28px;
   font-size: var(--text-title);
+}
+.book-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.book-dialog .sheet-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 24px;
+}
+.book-detail-back-bar {
+  flex: none;
+  padding: 12px 25px calc(16px + var(--bottom-safe));
+  background: var(--bg);
 }
 .book-facts {
   display: flex;
@@ -434,8 +462,21 @@ button.book-card-title:active {
   border: 1px solid var(--border);
   border-radius: 999px;
 }
-.sheet-body > .original-file {
-  font-size: var(--text-meta);
+.book-file-info {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.book-file-info > div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+}
+.book-file-info dt {
+  color: var(--muted);
+}
+.book-file-info dd {
+  margin: 0;
   overflow-wrap: anywhere;
 }
 .sheet-body > .book-stage-note {
@@ -756,14 +797,6 @@ button.book-card-title:active {
   }
 }
 
-/* The sheet scrolls, so the way out stays pinned to its bottom edge. */
-.book-back-button {
-  position: sticky;
-  bottom: 0;
-  margin-top: 20px;
-  background: var(--surface);
-  box-shadow: 0 -10px 12px 6px var(--surface);
-}
 .book-dialog-editing .sheet-body > h2 {
   padding-left: 0;
 }

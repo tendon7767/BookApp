@@ -179,7 +179,8 @@ h1 {
   background: var(--bg);
   z-index: 11;
 }
-.settings-back-bar button {
+.settings-back-bar button,
+.book-detail-back-bar button {
   width: 100%;
   min-height: 52px;
   display: flex;

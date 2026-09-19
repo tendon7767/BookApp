@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Cloud, Pencil, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, Cloud, Pencil, Trash2 } from 'lucide-react'
 import type { BookEdits, LibraryBook } from '../../domain/book'
 import { BookCover } from './BookCover'
 import { BookMetadataForm } from './BookMetadataForm'
@@ -33,16 +33,109 @@ export function BookDetails({
 }) {
   const readable = book.format === 'epub' || book.format === 'txt'
   const dialog = useRef<HTMLDialogElement>(null)
+  const closeRef = useRef(onClose)
   const [confirming, setConfirming] = useState(false)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const busy = saving
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
+    closeRef.current = onClose
+  }, [onClose])
+  useEffect(() => {
     const element = dialog.current
     element?.showModal()
     return () => element?.close()
   }, [confirming])
+  useEffect(() => {
+    const element = dialog.current
+    if (!element || editing || busy) return
+
+    const content = element.querySelector<HTMLElement>('.sheet-body')
+    let startY: number | null = null
+    let startX = 0
+    let startTime = 0
+    let distance = 0
+    let dragging = false
+    let closing = false
+    let animation: number | undefined
+
+    function reset() {
+      if (!element) return
+      element.style.transition = 'transform 200ms ease-out'
+      element.style.transform = ''
+      animation = window.setTimeout(() => {
+        element.style.transition = ''
+      }, 200)
+    }
+
+    function touchStart(event: TouchEvent) {
+      if (!element || closing || event.touches.length !== 1 || (content?.scrollTop ?? 0) > 0) return
+      if ((event.target as Element).closest('.book-detail-tools, .book-detail-back-bar')) return
+      if (animation) window.clearTimeout(animation)
+      startY = event.touches[0].clientY
+      startX = event.touches[0].clientX
+      startTime = performance.now()
+      distance = 0
+      dragging = false
+    }
+
+    function touchMove(event: TouchEvent) {
+      if (!element || startY === null || event.touches.length !== 1) return
+      if ((content?.scrollTop ?? 0) > 0) {
+        startY = null
+        return
+      }
+      const moveY = event.touches[0].clientY - startY
+      const moveX = event.touches[0].clientX - startX
+      if (!dragging && Math.abs(moveX) > Math.abs(moveY)) {
+        startY = null
+        return
+      }
+      if (moveY <= 4) return
+      event.preventDefault()
+      dragging = true
+      distance = moveY
+      element.style.transition = 'none'
+      element.style.transform = `translateY(${distance}px)`
+    }
+
+    function touchEnd() {
+      if (!element || startY === null) return
+      const shouldClose =
+        dragging &&
+        (distance > Math.min(140, element.clientHeight * 0.25) ||
+          (distance > 45 && distance / Math.max(1, performance.now() - startTime) > 0.65))
+      startY = null
+      if (shouldClose) {
+        closing = true
+        element.style.transition = 'transform 200ms ease-out'
+        element.style.transform = 'translateY(100dvh)'
+        animation = window.setTimeout(() => closeRef.current(), 200)
+      } else if (dragging) reset()
+      dragging = false
+    }
+
+    function touchCancel() {
+      startY = null
+      if (dragging) reset()
+      dragging = false
+    }
+
+    element.addEventListener('touchstart', touchStart, { passive: true })
+    element.addEventListener('touchmove', touchMove, { passive: false })
+    element.addEventListener('touchend', touchEnd)
+    element.addEventListener('touchcancel', touchCancel)
+    return () => {
+      element.removeEventListener('touchstart', touchStart)
+      element.removeEventListener('touchmove', touchMove)
+      element.removeEventListener('touchend', touchEnd)
+      element.removeEventListener('touchcancel', touchCancel)
+      if (animation) window.clearTimeout(animation)
+      element.style.transition = ''
+      element.style.transform = ''
+    }
+  }, [editing, busy])
   async function save(edits: BookEdits) {
     setSaving(true)
     setError(null)
@@ -111,14 +204,6 @@ export function BookDetails({
             </button>
           </div>
         )}
-        <button
-          className="icon-button close-dialog"
-          aria-label="關閉書籍資訊"
-          disabled={busy}
-          onClick={onClose}
-        >
-          <X size={22} />
-        </button>
         {!editing &&
           (readable ? (
             <button
@@ -136,7 +221,10 @@ export function BookDetails({
               <span>此格式尚未支援閱讀</span>
             </div>
           ))}
-        <h2 id="book-title">{book.title}</h2>
+        <h2 id="book-title">
+          {book.title}
+          {!editing && <span className="book-detail-author"> · {book.author || '未提供作者'}</span>}
+        </h2>
         {editing ? (
           <BookMetadataForm
             book={book}
@@ -151,44 +239,38 @@ export function BookDetails({
           />
         ) : (
           <>
-            <p className="book-detail-author">
-              {book.author || '未提供作者'}
-              {book.series && (
-                <>
-                  {' · '}
-                  {book.series}
-                  {book.volume != null ? ' 第 ' + book.volume + ' 集' : ''}
-                </>
-              )}
-            </p>
+            {book.series && (
+              <p className="book-detail-series">
+                {book.series}
+                {book.volume != null ? ' 第 ' + book.volume + ' 集' : ''}
+              </p>
+            )}
             <div className="book-detail-progress">
-              <span
-                className="book-detail-bar"
-                role="img"
-                aria-label={progressLabel(book)}
-                aria-hidden={book.progress ? undefined : true}
-              >
+              <div className="book-detail-bar" role="img" aria-label={progressLabel(book)}>
                 <span
+                  className="book-detail-fill"
                   style={{
                     width: `${Math.max(0, Math.min(100, (book.progress?.percentage ?? 0) * 100))}%`,
                   }}
                 />
-              </span>
-              <strong>{progressLabel(book)}</strong>
+                <strong aria-hidden="true">{progressLabel(book)}</strong>
+              </div>
               {book.progress && (
-                <time dateTime={new Date(book.progress.updatedAt).toISOString()}>
-                  {new Intl.DateTimeFormat('zh-TW', {
-                    month: 'numeric',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }).format(book.progress.updatedAt)}
-                </time>
+                <p className="book-detail-last-read">
+                  最後閱讀：
+                  <time dateTime={new Date(book.progress.updatedAt).toISOString()}>
+                    {new Intl.DateTimeFormat('zh-TW', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }).format(book.progress.updatedAt)}
+                  </time>
+                </p>
               )}
             </div>
             <div className="book-facts">
               <span>{book.category || '未分類'}</span>
-              <span>{book.format.toUpperCase()}</span>
               <span>
                 {book.downloaded === false ? <Cloud size={14} /> : <Check size={14} />}
                 {book.downloaded === false ? '僅在雲端' : '已存於本機'}
@@ -203,9 +285,21 @@ export function BookDetails({
               )}
             </div>
             <details className="book-detail-more">
-              <summary>原始檔案</summary>
-              <p className="original-file">{book.fileName}</p>
-              <p className="original-file">{formatFileSize(book.fileSize)}</p>
+              <summary>檔案資訊</summary>
+              <dl className="book-file-info">
+                <div>
+                  <dt>檔名</dt>
+                  <dd>{book.fileName}</dd>
+                </div>
+                <div>
+                  <dt>檔案類型</dt>
+                  <dd>{book.format.toUpperCase()}</dd>
+                </div>
+                <div>
+                  <dt>檔案大小</dt>
+                  <dd>{formatFileSize(book.fileSize)}</dd>
+                </div>
+              </dl>
             </details>
           </>
         )}
@@ -214,12 +308,15 @@ export function BookDetails({
             {error}
           </p>
         )}
-        {!editing && (
-          <button className="secondary-button full-width book-back-button" onClick={onClose}>
+      </div>
+      {!editing && (
+        <div className="book-detail-back-bar">
+          <button className="secondary-button" onClick={onClose}>
+            <ArrowLeft size={20} aria-hidden="true" />
             返回書架
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </dialog>
   )
 }

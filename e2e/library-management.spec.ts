@@ -20,9 +20,11 @@ test('edits, searches, filters and resumes recently read books without losing pr
   await page.getByRole('button', { name: '儲存變更', exact: true }).click()
   await expect(page.getByRole('dialog')).toContainText('山城夜讀')
   // The file name now lives in the collapsible details block.
-  await page.getByText('原始檔案', { exact: true }).click()
+  await page.getByText('檔案資訊', { exact: true }).click()
   await expect(page.getByRole('dialog')).toContainText('故事2.txt')
-  await page.getByRole('button', { name: '關閉書籍資訊', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('檔案類型')
+  await expect(page.getByRole('dialog')).toContainText('TXT')
+  await page.getByRole('button', { name: '返回書架', exact: true }).click()
   const search = page.getByRole('searchbox', { name: '搜尋書籍' })
   await search.fill('故事2 測試作者')
   await expect(page.getByText('找到 1 本書')).toBeVisible()
@@ -64,7 +66,7 @@ test('edits, searches, filters and resumes recently read books without losing pr
   await page.getByRole('button', { name: '編輯書籍資訊', exact: true }).click()
   await page.getByLabel('分類', { exact: true }).fill('')
   await page.getByRole('button', { name: '儲存變更', exact: true }).click()
-  await page.getByRole('button', { name: '關閉書籍資訊', exact: true }).click()
+  await page.getByRole('button', { name: '返回書架', exact: true }).click()
   await expect(page.getByText('沒有符合的書籍', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '清除篩選', exact: true }).click()
   await expect(card.locator('.book-cover-progress')).toHaveAttribute('aria-label', '已讀 68%')
@@ -108,6 +110,76 @@ test('blank names are rejected and a failed save keeps editable values for retry
     page.getByRole('button', { name: '書籍資訊 原書名', exact: true, includeHidden: true }),
   ).toBeAttached()
   await page.getByRole('button', { name: '儲存變更', exact: true }).click()
-  await page.getByRole('button', { name: '關閉書籍資訊', exact: true }).click()
+  await page.getByRole('button', { name: '返回書架', exact: true }).click()
   await expect(page.getByRole('button', { name: '書籍資訊 新的書名', exact: true })).toBeVisible()
+})
+
+test('book details keep the back button visible and follow a downward swipe', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  await page.goto('./')
+  await page.getByLabel('選擇書籍檔案').setInputFiles({
+    name: '手勢測試.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('第一章\n往下滑動。'),
+  })
+  await page.getByRole('button', { name: '書籍資訊 手勢測試', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: '手勢測試 · 未提供作者' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '關閉書籍資訊' })).toHaveCount(0)
+  const deleteButton = dialog.getByRole('button', { name: '刪除書籍' })
+  const editButton = dialog.getByRole('button', { name: '編輯書籍資訊' })
+  expect((await deleteButton.boundingBox())!.y).toBeLessThan((await editButton.boundingBox())!.y)
+  const heading = await dialog.getByRole('heading').boundingBox()
+  const progress = await dialog.locator('.book-detail-bar').boundingBox()
+  expect(progress?.x).toBe(heading?.x)
+  expect(progress?.width).toBe(heading?.width)
+  await expect(dialog.locator('.book-detail-bar strong')).toHaveText('尚未閱讀')
+  await expect(dialog.locator('.book-facts > span')).toHaveCount(3)
+  await dialog.getByText('檔案資訊', { exact: true }).click()
+  await expect(dialog.locator('.book-file-info')).toContainText('檔名')
+  await expect(dialog.locator('.book-file-info')).toContainText('檔案類型')
+  await expect(dialog.locator('.book-file-info')).toContainText('檔案大小')
+  const back = dialog.getByRole('button', { name: '返回書架', exact: true })
+  const before = await back.boundingBox()
+  await dialog.locator('.sheet-body').evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+  await expect
+    .poll(() => dialog.locator('.sheet-body').evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0)
+  const after = await back.boundingBox()
+  expect(after?.y).toBe(before?.y)
+  await dialog.locator('.sheet-body').evaluate((element) => {
+    element.scrollTop = 0
+  })
+  await page.screenshot({ path: test.info().outputPath('book-details.png') })
+
+  async function drag(distance: number) {
+    return page.evaluate((amount) => {
+      const sheet = document.querySelector<HTMLDialogElement>('.book-dialog')!
+      const handle = sheet.querySelector<HTMLElement>('.sheet-handle')!
+      const rect = handle.getBoundingClientRect()
+      const x = rect.x + rect.width / 2
+      const y = rect.y + rect.height / 2
+      const start = new Event('touchstart', { bubbles: true })
+      Object.defineProperty(start, 'touches', { value: [{ clientX: x, clientY: y }] })
+      const moved = new Event('touchmove', { bubbles: true, cancelable: true })
+      Object.defineProperty(moved, 'touches', { value: [{ clientX: x, clientY: y + amount }] })
+      handle.dispatchEvent(start)
+      handle.dispatchEvent(moved)
+      return sheet.style.transform
+    }, distance)
+  }
+
+  expect(await drag(35)).toBe('translateY(35px)')
+  await dialog.locator('.sheet-handle').evaluate((handle) => {
+    handle.dispatchEvent(new Event('touchend', { bubbles: true }))
+  })
+  await expect(dialog).toBeVisible()
+  await expect.poll(() => dialog.evaluate((element) => element.style.transform)).toBe('')
+  expect(await drag(180)).toBe('translateY(180px)')
+  await dialog.locator('.sheet-handle').evaluate((handle) => {
+    handle.dispatchEvent(new Event('touchend', { bubbles: true }))
+  })
+  await expect(dialog).toHaveCount(0)
 })
