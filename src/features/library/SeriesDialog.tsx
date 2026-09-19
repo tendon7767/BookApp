@@ -4,6 +4,7 @@ import type { LibraryBook } from '../../domain/book'
 import type { SeriesAssignment } from '../../domain/series'
 import { SeriesFields, VolumeField } from './SeriesFields'
 import { suggestSeries } from './seriesSuggestions'
+import { useBackLayer } from '../../platform/useBackLayer'
 
 export function SeriesDialog({
   books,
@@ -22,6 +23,7 @@ export function SeriesDialog({
   const [volumes, setVolumes] = useState(suggestions.volumes)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  useBackLayer(true, onClose, busy)
   useEffect(() => {
     const el = dialog.current
     el?.showModal()

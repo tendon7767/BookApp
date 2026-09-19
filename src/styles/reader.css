@@ -290,9 +290,16 @@
 .reader-slider {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   max-width: 640px;
   margin: auto;
+}
+.reader-page-button {
+  flex: 0 0 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  background: transparent;
 }
 .reader-slider input {
   flex: 1;
@@ -321,27 +328,15 @@
   font-size: var(--text-body);
   justify-content: center;
 }
-.reader-return-button {
+.reader-back-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  min-height: 42px;
-  margin: 2px auto 0;
-  padding: 6px 12px;
-  color: var(--accent);
-  background: transparent;
-  font-size: var(--text-meta);
-}
-.reader-hint {
-  display: block;
+  gap: 8px;
   width: 100%;
-  padding: 6px 0;
-  text-align: center;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--text-meta);
-  margin-top: 4px;
+  max-width: 640px;
+  min-height: 52px;
+  margin: 8px auto 0;
 }
 .reader-loading {
   position: absolute;
@@ -492,9 +487,6 @@
 .reader-result-list span {
   line-height: 1.6;
 }
-.bookmark-list li > .icon-button {
-  flex: 0 0 46px;
-}
 @media (min-width: 760px) {
   .epub-host,
   .text-host {
@@ -532,32 +524,6 @@
 .reader-page {
   position: absolute;
   inset: 0;
-}
-.reader-flip-a {
-  animation: reader-flip-a 170ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-.reader-flip-b {
-  animation: reader-flip-b 170ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-@keyframes reader-flip-a {
-  from {
-    transform: translate(var(--flip-dx, 0), var(--flip-dy, 0));
-    opacity: 0.45;
-  }
-  to {
-    transform: none;
-    opacity: 1;
-  }
-}
-@keyframes reader-flip-b {
-  from {
-    transform: translate(var(--flip-dx, 0), var(--flip-dy, 0));
-    opacity: 0.45;
-  }
-  to {
-    transform: none;
-    opacity: 1;
-  }
 }
 .tap-zone-hint {
   position: absolute;

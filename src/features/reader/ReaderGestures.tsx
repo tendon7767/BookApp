@@ -9,19 +9,24 @@ export function ReaderGestures({
   onGesture,
   onDragMove,
   onDragEnd,
+  onDragCancel,
   axis,
 }: {
   onGesture: (gesture: 'next' | 'previous' | 'toggle') => void
   // Both are set together; without them a swipe simply turns the page on release.
   onDragMove?: (delta: number) => void
   onDragEnd?: (delta: number, size: number) => void
+  onDragCancel?: () => void
   // Taps and swipes share the reading direction chosen for the book.
   axis: 'horizontal' | 'vertical'
 }) {
   const start = useRef<{ id: number; x: number; y: number; time: number } | null>(null)
   const dragging = useRef(false)
   function reset() {
-    if (dragging.current) onDragMove?.(0)
+    if (dragging.current) {
+      if (onDragCancel) onDragCancel()
+      else onDragMove?.(0)
+    }
     dragging.current = false
     start.current = null
   }
@@ -62,7 +67,10 @@ export function ReaderGestures({
         start.current = null
         dragging.current = false
         if (!down || down.id !== event.pointerId) {
-          if (dragged) onDragMove?.(0)
+          if (dragged) {
+            if (onDragCancel) onDragCancel()
+            else onDragMove?.(0)
+          }
           return
         }
         const dx = event.clientX - down.x,

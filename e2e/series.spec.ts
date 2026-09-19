@@ -81,6 +81,7 @@ test('series can be assigned in bulk, searched, ordered, edited and read offline
     await expect(page.locator('.text-page')).toBeVisible()
     await page.getByRole('button', { name: '閱讀選單', exact: true }).click()
     await page.getByRole('button', { name: '返回書架', exact: true }).click()
+    await page.getByRole('button', { name: '開啟系列 山城故事', exact: true }).click()
     await page.getByRole('button', { name: '書籍資訊 序曲', exact: true }).click()
     await page.getByRole('button', { name: '編輯書籍資訊', exact: true }).click()
     await expect(page.getByLabel('系列', { exact: true })).toHaveValue('山城故事')
@@ -95,6 +96,7 @@ test('series can be assigned in bulk, searched, ordered, edited and read offline
     // Reveal controls through the reader's accessible menu.
     await page.getByRole('button', { name: '閱讀選單', exact: true }).click()
     await page.getByRole('button', { name: '返回書架', exact: true }).click()
+    await page.getByRole('button', { name: '開啟系列 山城故事', exact: true }).click()
     await expect(page.locator('.series-heading')).toContainText('山城故事')
     await expect(page.locator('.book-card').first()).not.toContainText('上次閱讀')
     await page.screenshot({ path: testInfo.outputPath('series-volumes.png') })

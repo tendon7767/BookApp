@@ -10,6 +10,14 @@ import { useLibrary } from './features/library/useLibrary'
 import { useCloudLibrary } from './features/cloud/useCloudLibrary'
 import { CloudLibraryScreen } from './features/cloud/CloudLibraryScreen'
 import { StorageScreen } from './features/settings/StorageScreen'
+import {
+  appDepth,
+  appHistorySettled,
+  appLayers,
+  appRoute,
+  writeAppRoute,
+} from './platform/appHistory'
+import { useBackLayer } from './platform/useBackLayer'
 
 const TextReader = lazy(() => import('./features/reader/text/TextReader'))
 const EpubReader = lazy(() => import('./features/reader/epub/EpubReader'))
@@ -18,9 +26,11 @@ export default function App() {
   const [screen, setScreen] = useState<'library' | 'settings' | 'cloud' | 'storage'>('library')
   const [installOpen, setInstallOpen] = useState(false)
   const [reading, setReading] = useState<BookMetadata | null>(null)
+  useBackLayer(installOpen, () => setInstallOpen(false))
   const settings = usePreferences()
   const status = usePwaStatus()
   const library = useLibrary()
+  const { books, setActiveSeries } = library
   const cloud = useCloudLibrary(
     screen === 'cloud' || screen === 'storage',
     status.online,
@@ -30,16 +40,77 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.offline = status.offlineState
   }, [status.offlineState])
-  function navigate(next: typeof screen) {
+  useEffect(() => {
+    // A reload starts at the shelf, as before; same-document Back still uses the route entries.
+    writeAppRoute({ kind: 'library' }, true)
+  }, [])
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      // ReaderView saves its pending position before leaving the reader.
+      if (reading) return
+      const route = appRoute(event.state)
+      if (route?.kind === 'reader') {
+        const book = books.find((item) => item.id === route.bookId)
+        if (book) {
+          setScreen('library')
+          setActiveSeries(null)
+          setReading(book)
+          return
+        }
+        writeAppRoute({ kind: 'library' }, true)
+      }
+      setScreen(
+        route?.kind === 'settings' || route?.kind === 'cloud' || route?.kind === 'storage'
+          ? route.kind
+          : 'library',
+      )
+      setActiveSeries(route?.kind === 'series' ? route.name : null)
+      window.scrollTo({ top: 0 })
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [reading, books, setActiveSeries])
+  async function navigate(next: typeof screen) {
+    await appHistorySettled()
+    const current = appRoute()
+    if (next === 'library') {
+      if (appDepth() > 0) window.history.go(-appDepth())
+      else {
+        setScreen('library')
+        library.setActiveSeries(null)
+      }
+      return
+    }
+    if (current?.kind !== next) writeAppRoute({ kind: next }, current?.kind === 'series')
     setScreen(next)
+    library.setActiveSeries(null)
+    window.scrollTo({ top: 0 })
+  }
+  async function selectSeries(name: string | null) {
+    await appHistorySettled()
+    if (!name) {
+      if (appRoute()?.kind === 'series') window.history.back()
+      else library.setActiveSeries(null)
+      return
+    }
+    const current = appRoute()
+    writeAppRoute({ kind: 'series', name }, !!current && current.kind !== 'library')
+    library.setActiveSeries(name)
     window.scrollTo({ top: 0 })
   }
   async function openBook(book: BookMetadata) {
+    await appHistorySettled()
     if (book.downloaded === false) {
-      navigate('cloud')
-      if (!(await cloud.ensureDownloaded(book))) return
+      await navigate('cloud')
+      if (!(await cloud.ensureDownloaded(book)) || appRoute()?.kind !== 'cloud') return
     }
-    navigate('library')
+    const current = appRoute()
+    writeAppRoute(
+      { kind: 'reader', bookId: book.id },
+      (!!current && current.kind !== 'library') || appLayers().length > 0,
+    )
+    setScreen('library')
+    library.setActiveSeries(null)
     setReading(book)
   }
 
@@ -58,7 +129,10 @@ export default function App() {
           book={reading}
           onClose={() => {
             setReading(null)
+            setScreen('library')
+            library.setActiveSeries(null)
             void library.reload()
+            if (appDepth() > 0) window.history.go(-appDepth())
           }}
         />
       </Suspense>
@@ -125,6 +199,7 @@ export default function App() {
           <LibraryScreen
             library={library}
             onRead={(book) => void openBook(book)}
+            onSeriesChange={selectSeries}
             cloudReady={cloud.connected && !!cloud.target}
             onRemoveCloud={(books) => cloud.purgeOriginals(books)}
           />

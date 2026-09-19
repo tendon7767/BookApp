@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import type { LibraryBook } from '../../domain/book'
+import { useBackLayer } from '../../platform/useBackLayer'
 
 export function BulkBookDialog({
   books,
@@ -17,6 +18,7 @@ export function BulkBookDialog({
   const [category, setCategory] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useBackLayer(true, onClose, busy)
   useEffect(() => {
     const el = dialog.current
     el?.showModal()

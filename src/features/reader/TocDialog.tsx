@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+import { useBackLayer } from '../../platform/useBackLayer'
 export interface TocEntry {
   label: string
   href: string
@@ -45,6 +46,7 @@ export function TocDialog({
   onClose: () => void
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  useBackLayer(true, onClose)
   useEffect(() => {
     const dialog = ref.current
     dialog?.showModal()

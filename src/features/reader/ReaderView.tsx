@@ -1,23 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import {
-  ArrowLeft,
-  Bookmark,
-  ChevronLeft,
-  ChevronRight,
-  History,
-  List,
-  Search,
-  X,
-} from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, List, Search, X } from 'lucide-react'
 import type { BookMetadata, ReadingLocation } from '../../domain/book'
-import { emptyReadingMarks, type ReadingMarks } from '../../domain/readingMarks'
-import {
-  addBookmark,
-  popReadingTrail,
-  pushReadingTrail,
-  readReadingMarks,
-  removeBookmark,
-} from '../../storage/readingMarksRepository'
 import { TocDialog } from './TocDialog'
 import { ReaderGestures } from './ReaderGestures'
 import { TapZoneHint } from './TapZoneHint'
@@ -26,6 +9,7 @@ import { readingColors, type ReadingSettings } from './readingSettings'
 import type { TocEntry } from './TocDialog'
 import { ReaderToolsDialog } from './ReaderToolsDialog'
 import type { ReaderSearchResult } from './search'
+import { appRoute } from '../../platform/appHistory'
 
 export interface ReaderState {
   ready: boolean
@@ -41,7 +25,6 @@ export interface ReaderState {
   busy: boolean
   readingSettings: ReadingSettings
   updateSettings: (value: ReadingSettings) => void
-  location: ReadingLocation | null
   act: (gesture: 'next' | 'previous' | 'toggle') => void | Promise<void>
   flush: () => Promise<void>
   seek: (value: number) => Promise<void>
@@ -65,7 +48,6 @@ export function ReaderView({
   const [tocOpen, setTocOpen] = useState(false)
   const [typographyOpen, setTypographyOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
-  const [marks, setMarks] = useState<ReadingMarks>(emptyReadingMarks)
   const [closing, setClosing] = useState(false)
   const [exitError, setExitError] = useState(false)
   const [slider, setSlider] = useState<number | null>(null)
@@ -78,23 +60,13 @@ export function ReaderView({
       return false
     }
   })
-  const [flip, setFlip] = useState<{ gesture: 'next' | 'previous'; count: number } | null>(null)
   const page = useRef<HTMLDivElement>(null)
   const turning = useRef(false)
+  const animation = useRef(0)
+  const exiting = useRef(false)
+  const closeOnBack = useRef<(() => Promise<void>) | null>(null)
   const seekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const setReaderNotice = reader.setNotice
   useEffect(() => () => clearTimeout(seekTimer.current), [])
-  useEffect(() => {
-    let active = true
-    void readReadingMarks(book.id)
-      .then((value) => {
-        if (active) setMarks(value)
-      })
-      .catch(() => setReaderNotice('書籤暫時無法讀取，請返回書架後重試。'))
-    return () => {
-      active = false
-    }
-  }, [book.id, setReaderNotice])
   const zones = reader.readingSettings.tapZones
   // The hint waits for the first rendered page, then fades on its own.
   useEffect(() => {
@@ -129,36 +101,60 @@ export function ReaderView({
   // The page follows the finger; an edge resists instead of opening a gap.
   function dragMove(delta: number) {
     if (turning.current) return
-    // A running turn animation would otherwise outrank the inline transform.
-    if (flip) setFlip(null)
+    animation.current++
     const blocked = delta > 0 ? reader.position?.atStart : reader.position?.atEnd
+    if (page.current) page.current.style.opacity = '1'
     shift(blocked ? delta / 4 : delta)
   }
   function dragEnd(delta: number, size: number) {
     if (turning.current) return
     const gesture = delta < 0 ? 'next' : 'previous'
-    // Only the distance decides here: the reported position can lag a turn behind,
-    // and the engine itself refuses to move past the first or last page.
-    if (Math.abs(delta) < Math.max(56, size * 0.2)) {
+    const blocked = delta > 0 ? reader.position?.atStart : reader.position?.atEnd
+    if (reader.busy || blocked || Math.abs(delta) < Math.max(56, size * 0.2)) {
       shift(0, 180)
       return
     }
-    // The engine swaps pages while the drag finishes, so the gap is only as long
-    // as the swap itself, and part of the old page stays on screen throughout.
     turning.current = true
-    const swap = Promise.resolve(reader.act(gesture)).catch(() => undefined)
-    shift(delta < 0 ? -size * 0.6 : size * 0.6, 90)
-    void Promise.all([new Promise((resolve) => setTimeout(resolve, 90)), swap]).then(() => {
-      shift(0)
+    const animationId = ++animation.current
+    const element = page.current
+    if (!element) {
       turning.current = false
-      setFlip((previous) => ({ gesture, count: (previous?.count ?? 0) + 1 }))
-    })
+      return
+    }
+    // Finish the outgoing motion before replacing its content. Reset the
+    // transform only while invisible, so there is no second position jump.
+    const distance = Math.max(size, Math.abs(delta)) * (delta < 0 ? -1 : 1)
+    element.style.transition = 'transform 130ms ease-out, opacity 130ms ease-out'
+    element.style.transform =
+      zones === 'vertical' ? `translate3d(0, ${distance}px, 0)` : `translate3d(${distance}px, 0, 0)`
+    element.style.opacity = '0'
+    void (async () => {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 140))
+        await Promise.resolve(reader.act(gesture))
+      } finally {
+        element.style.transition = 'none'
+        element.style.transform = ''
+        element.style.opacity = '0'
+        // Commit the reset before revealing the new page.
+        void element.offsetWidth
+        element.style.transition = 'opacity 130ms ease-out'
+        element.style.opacity = '1'
+        turning.current = false
+        await new Promise((resolve) => setTimeout(resolve, 140))
+        if (animation.current === animationId) {
+          element.style.transition = ''
+          element.style.opacity = ''
+        }
+      }
+    })().catch(() => undefined)
   }
-  const flipOffset = flip?.gesture === 'previous' ? '-40px' : '40px'
   const percentage = reader.position?.percentage
   const label = percentage == null ? '計算進度中…' : `${Math.round(percentage * 100)}%`
   const colors = readingColors(reader.readingSettings)
   async function close() {
+    if (exiting.current) return
+    exiting.current = true
     setClosing(true)
     try {
       clearTimeout(seekTimer.current)
@@ -169,31 +165,26 @@ export function ReaderView({
       await reader.flush()
       onClose()
     } catch {
+      exiting.current = false
       setExitError(true)
       setClosing(false)
     }
   }
-  async function remember(label: string) {
-    if (!reader.location) return
-    try {
-      setMarks(
-        await pushReadingTrail(book.id, {
-          location: reader.location,
-          percentage: reader.position?.percentage ?? 0,
-          label,
-        }),
-      )
-    } catch {
-      reader.setNotice('未能保存跳轉前位置，仍會繼續開啟目標內容。')
+  useEffect(() => {
+    closeOnBack.current = close
+  })
+  useEffect(() => {
+    const onBack = () => {
+      if (appRoute()?.kind !== 'reader') void closeOnBack.current?.()
     }
-  }
+    window.addEventListener('popstate', onBack)
+    return () => window.removeEventListener('popstate', onBack)
+  }, [])
   function seek(value: number) {
     setSlider(value)
     clearTimeout(seekTimer.current)
     seekTimer.current = setTimeout(() => {
-      void remember(`跳轉前 · ${label}`)
-        .then(() => reader.seek(value / 100))
-        .finally(() => setSlider(null))
+      void reader.seek(value / 100).finally(() => setSlider(null))
     }, 200)
   }
   return (
@@ -219,16 +210,7 @@ export function ReaderView({
         if (event.key === 'Escape') reader.setControls(!reader.controls)
       }}
     >
-      <div
-        ref={page}
-        className={`reader-page${flip ? ` reader-flip-${flip.count % 2 ? 'a' : 'b'}` : ''}`}
-        style={
-          {
-            '--flip-dx': zones === 'vertical' ? '0px' : flipOffset,
-            '--flip-dy': zones === 'vertical' ? flipOffset : '0px',
-          } as CSSProperties
-        }
-      >
+      <div ref={page} className="reader-page">
         {children}
       </div>
       {reader.ready && (
@@ -237,6 +219,7 @@ export function ReaderView({
           onGesture={act}
           onDragMove={sliding ? dragMove : undefined}
           onDragEnd={sliding ? dragEnd : undefined}
+          onDragCancel={sliding ? () => shift(0, 180) : undefined}
         />
       )}
       {hint && reader.ready && <TapZoneHint tapZones={zones} />}
@@ -247,14 +230,6 @@ export function ReaderView({
       )}
       {(reader.controls || !reader.ready) && (
         <header className="reader-toolbar">
-          <button
-            className="icon-button"
-            aria-label="返回書架"
-            onClick={() => void close()}
-            disabled={closing || reader.busy}
-          >
-            <ArrowLeft size={22} />
-          </button>
           <h1>{book.title}</h1>
           <button
             className="icon-button"
@@ -276,76 +251,62 @@ export function ReaderView({
           {label}
         </button>
       )}
-      {reader.controls && reader.ready && (
+      {(reader.controls || !reader.ready) && (
         <footer className="reader-controls" aria-label="閱讀控制">
-          <div className="reader-slider">
-            <input
-              aria-label="閱讀進度"
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              disabled={percentage == null || reader.busy}
-              value={slider ?? Math.round((percentage ?? 0) * 100)}
-              onChange={(event) => seek(Number(event.target.value))}
-            />
-            <output>{slider === null ? label : `${slider}%`}</output>
-          </div>
-          <div className="reader-actions">
-            <button
-              onClick={() => act('previous')}
-              disabled={reader.busy || reader.position?.atStart}
-            >
-              <ChevronLeft size={20} />
-              上一頁
-            </button>
-            <button onClick={() => setTocOpen(true)}>
-              <List size={20} />
-              目錄
-            </button>
-            <button onClick={() => setToolsOpen(true)}>
-              <Search size={19} />
-              搜尋
-            </button>
-            <button
-              onClick={() => {
-                if (!reader.location) return
-                void addBookmark(book.id, {
-                  location: reader.location,
-                  percentage: reader.position?.percentage ?? 0,
-                  label: reader.position?.href || `${label} 的位置`,
-                })
-                  .then(setMarks)
-                  .catch(() => reader.setNotice('書籤未能保存，請稍後重試。'))
-              }}
-            >
-              <Bookmark size={19} />
-              書籤
-            </button>
-            <button aria-label="閱讀排版" onClick={() => setTypographyOpen(true)}>
-              <span className="aa-label">Aa</span>
-            </button>
-            <button onClick={() => act('next')} disabled={reader.busy || reader.position?.atEnd}>
-              下一頁
-              <ChevronRight size={20} />
-            </button>
-          </div>
-          {marks.trail.length > 0 && (
-            <button
-              className="reader-return-button"
-              onClick={() => {
-                void popReadingTrail(book.id).then(({ marks: next, popped }) => {
-                  setMarks(next)
-                  if (popped) void reader.navigate(popped.location)
-                })
-              }}
-            >
-              <History size={18} /> 返回跳轉前位置
-            </button>
+          {reader.ready && (
+            <>
+              <div className="reader-slider">
+                <button
+                  className="reader-page-button"
+                  aria-label="上一頁"
+                  onClick={() => act('previous')}
+                  disabled={reader.busy || reader.position?.atStart}
+                >
+                  <ChevronLeft size={22} aria-hidden="true" />
+                </button>
+                <input
+                  aria-label="閱讀進度"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  disabled={percentage == null || reader.busy}
+                  value={slider ?? Math.round((percentage ?? 0) * 100)}
+                  onChange={(event) => seek(Number(event.target.value))}
+                />
+                <output>{slider === null ? label : `${slider}%`}</output>
+                <button
+                  className="reader-page-button"
+                  aria-label="下一頁"
+                  onClick={() => act('next')}
+                  disabled={reader.busy || reader.position?.atEnd}
+                >
+                  <ChevronRight size={22} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="reader-actions">
+                <button aria-label="閱讀排版" onClick={() => setTypographyOpen(true)}>
+                  <span className="aa-label">Aa</span>
+                </button>
+                <button onClick={() => setTocOpen(true)}>
+                  <List size={20} />
+                  目錄
+                </button>
+                <button onClick={() => setToolsOpen(true)}>
+                  <Search size={19} />
+                  搜尋
+                </button>
+              </div>
+              {extraControls}
+            </>
           )}
-          {extraControls}
-          <button className="reader-hint" aria-label="顯示點按區域" onClick={() => setHint(true)}>
-            {zones === 'vertical' ? '上下點按或上下滑動' : '左右點按或左右滑動'} · 點中央開關選單
+          <button
+            className="secondary-button reader-back-button"
+            onClick={() => void close()}
+            disabled={closing || reader.busy}
+          >
+            <ArrowLeft size={20} aria-hidden="true" />
+            返回書架
           </button>
         </footer>
       )}
@@ -379,20 +340,18 @@ export function ReaderView({
           onClose={() => setTocOpen(false)}
           onSelect={(href) => {
             setTocOpen(false)
-            void remember(`目錄跳轉前 · ${label}`).then(() => reader.jump(href))
+            void reader.jump(href)
           }}
         />
       )}
       {toolsOpen && (
         <ReaderToolsDialog
-          marks={marks}
           onClose={() => setToolsOpen(false)}
           onSearch={reader.search}
           onSelect={(result) => {
             setToolsOpen(false)
-            void remember(`跳轉前 · ${label}`).then(() => reader.navigate(result.location))
+            void reader.navigate(result.location)
           }}
-          onRemoveBookmark={(id) => void removeBookmark(book.id, id).then(setMarks)}
         />
       )}
       {typographyOpen && (

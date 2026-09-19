@@ -1,22 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bookmark, Search, Trash2, X } from 'lucide-react'
-import type { ReadingMarks } from '../../domain/readingMarks'
+import { Search, X } from 'lucide-react'
+import { useBackLayer } from '../../platform/useBackLayer'
 import type { ReaderSearchResult } from './search'
 
 export function ReaderToolsDialog({
-  marks,
   onClose,
   onSearch,
   onSelect,
-  onRemoveBookmark,
 }: {
-  marks: ReadingMarks
   onClose: () => void
   onSearch: (query: string) => Promise<ReaderSearchResult[]>
   onSelect: (result: ReaderSearchResult) => void
-  onRemoveBookmark: (id: string) => void
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  useBackLayer(true, onClose)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ReaderSearchResult[]>([])
   const [searching, setSearching] = useState(false)
@@ -48,7 +45,7 @@ export function ReaderToolsDialog({
       onCancel={onClose}
     >
       <header className="toc-header">
-        <h2 id="reader-tools-title">搜尋與書籤</h2>
+        <h2 id="reader-tools-title">搜尋</h2>
         <button className="icon-button" aria-label="關閉" onClick={onClose}>
           <X size={21} />
         </button>
@@ -93,61 +90,6 @@ export function ReaderToolsDialog({
       {!searching && searched && results.length === 0 && (
         <p className="quiet-note">沒有搜尋結果。</p>
       )}
-      <section className="reader-tool-section" aria-labelledby="bookmarks-title">
-        <h3 id="bookmarks-title">
-          <Bookmark size={17} /> 書籤 · {marks.bookmarks.length}
-        </h3>
-        {marks.bookmarks.length ? (
-          <ol className="reader-result-list bookmark-list">
-            {marks.bookmarks.map((bookmark) => (
-              <li key={bookmark.id}>
-                <button
-                  onClick={() =>
-                    onSelect({
-                      id: bookmark.id,
-                      location: bookmark.location,
-                      excerpt: bookmark.excerpt || bookmark.label,
-                    })
-                  }
-                >
-                  <small>{Math.round(bookmark.percentage * 100)}%</small>
-                  <span>{bookmark.label}</span>
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label={`刪除書籤 ${bookmark.label}`}
-                  onClick={() => onRemoveBookmark(bookmark.id)}
-                >
-                  <Trash2 size={18} />
-                </button>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="quiet-note">還沒有書籤。</p>
-        )}
-      </section>
-      <section className="reader-tool-section" aria-labelledby="trail-title">
-        <h3 id="trail-title">跳轉足跡 · {marks.trail.length}</h3>
-        {marks.trail.length ? (
-          <ol className="reader-result-list">
-            {marks.trail.map((entry) => (
-              <li key={entry.id}>
-                <button
-                  onClick={() =>
-                    onSelect({ id: entry.id, location: entry.location, excerpt: entry.label })
-                  }
-                >
-                  <small>{Math.round(entry.percentage * 100)}%</small>
-                  <span>{entry.label}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="quiet-note">使用目錄、進度或搜尋跳轉後，這裡會保留原位置。</p>
-        )}
-      </section>
     </dialog>
   )
 }

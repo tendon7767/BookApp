@@ -49,6 +49,7 @@ export class EpubEngine implements ReaderAdapter<Extract<ReadingLocation, { form
   private host?: HTMLElement
   private size = { width: 0, height: 0 }
   private reflowing = false
+  private changing = false
   private anchor?: string
   private anchored = false
 
@@ -94,7 +95,7 @@ export class EpubEngine implements ReaderAdapter<Extract<ReadingLocation, { form
     rendition.on('relocated', (position: Location) => {
       if (this.disposed) return
       this.latest = position
-      if (!this.reflowing) {
+      if (!this.reflowing && !this.changing) {
         if (!this.anchored) this.anchor = position.start.cfi
         if (this.ready) this.emitPosition()
       }
@@ -298,13 +299,40 @@ export class EpubEngine implements ReaderAdapter<Extract<ReadingLocation, { form
     )
     if (!this.disposed) await this.display(anchor)
   }
+  private async changePage(task: () => Promise<void>) {
+    const host = this.host
+    const visibility = host?.style.visibility
+    const oldHref = this.latest?.start.href
+    // epub.js can briefly expose a column before its fonts and location have
+    // settled. Keep its iframe out of paint until the final column is known.
+    if (host) host.style.visibility = 'hidden'
+    this.changing = true
+    try {
+      await task()
+      const chapterChanged = oldHref !== this.latest?.start.href
+      const contents = this.rendition!.getContents() as unknown as Contents[]
+      await Promise.all(contents.map((content) => content.document.fonts?.ready))
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      )
+      // A new section may change its column width after the initial location
+      // report. Place the same text again using the final font metrics.
+      if (chapterChanged && this.latest?.start.cfi) await this.display(this.latest.start.cfi)
+      else await this.withLocation(() => Promise.resolve())
+      this.anchor = this.latest?.start.cfi
+    } finally {
+      this.changing = false
+      if (host) host.style.visibility = visibility ?? ''
+      this.emitPosition()
+    }
+  }
   navigate(location: Extract<ReadingLocation, { format: 'epub' }>) {
     return this.goTo(location.cfi)
   }
   goTo(href: string) {
     return this.run(() => {
       this.anchored = false
-      return this.display(href)
+      return this.changePage(() => this.display(href))
     })
   }
   seek(percentage: number) {
@@ -315,7 +343,7 @@ export class EpubEngine implements ReaderAdapter<Extract<ReadingLocation, { form
     return this.run(async () => {
       if (!this.latest?.atEnd) {
         this.anchored = false
-        await this.withLocation(() => this.rendition!.next())
+        await this.changePage(() => this.withLocation(() => this.rendition!.next()))
       }
     })
   }
@@ -323,7 +351,7 @@ export class EpubEngine implements ReaderAdapter<Extract<ReadingLocation, { form
     return this.run(async () => {
       if (!this.latest?.atStart) {
         this.anchored = false
-        await this.withLocation(() => this.rendition!.prev())
+        await this.changePage(() => this.withLocation(() => this.rendition!.prev()))
       }
     })
   }

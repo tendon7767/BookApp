@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Minus, Plus, X } from 'lucide-react'
+import { useBackLayer } from '../../platform/useBackLayer'
 import {
   defaultReadingSettings,
   readerFonts,
@@ -30,6 +31,7 @@ export function TypographyPanel({
   busy?: boolean
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  useBackLayer(true, onClose, busy)
   useEffect(() => {
     const dialog = ref.current
     dialog?.showModal()

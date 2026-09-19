@@ -5,6 +5,7 @@ import { BookCover } from './BookCover'
 import { BookMetadataForm } from './BookMetadataForm'
 import { RemoveBooksDialog, type RemoveMode } from './RemoveBooksDialog'
 import { progressLabel } from './libraryView'
+import { useBackLayer } from '../../platform/useBackLayer'
 
 function formatFileSize(bytes: number): string {
   return bytes >= 1024 * 1024
@@ -39,6 +40,8 @@ export function BookDetails({
   const [saving, setSaving] = useState(false)
   const busy = saving
   const [error, setError] = useState<string | null>(null)
+  useBackLayer(true, onClose, busy)
+  useBackLayer(editing, () => setEditing(false), busy)
   useEffect(() => {
     closeRef.current = onClose
   }, [onClose])
@@ -173,7 +176,10 @@ export function BookDetails({
       aria-labelledby="book-title"
       onCancel={(event) => {
         if (busy) event.preventDefault()
-        else onClose()
+        else if (editing) {
+          event.preventDefault()
+          setEditing(false)
+        } else onClose()
       }}
       onClick={(event) => {
         if (event.target === event.currentTarget && !busy) onClose()

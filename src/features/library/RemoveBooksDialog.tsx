@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import type { LibraryBook } from '../../domain/book'
+import { useBackLayer } from '../../platform/useBackLayer'
 
 export type RemoveMode = 'download' | 'shelf' | 'cloud'
 
@@ -19,6 +20,7 @@ export function RemoveBooksDialog({
   const [mode, setMode] = useState<RemoveMode>('shelf')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useBackLayer(true, onClose, busy)
   useEffect(() => {
     const el = dialog.current
     el?.showModal()

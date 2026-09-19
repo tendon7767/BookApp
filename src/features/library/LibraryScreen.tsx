@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowDownWideNarrow, ArrowLeft, SquareCheckBig } from 'lucide-react'
 import type { BookMetadata, LibraryBook } from '../../domain/book'
 import type { LibraryState } from './useLibrary'
@@ -21,15 +21,19 @@ import { LibrarySelectionBar } from './LibrarySelectionBar'
 import { categoriesFor, visibleBooks } from './libraryView'
 import { RemoveBooksDialog, type RemoveMode } from './RemoveBooksDialog'
 import { removeBookDownloads } from '../../storage/bookRepository'
+import { useBackLayer } from '../../platform/useBackLayer'
+import { appHistorySettled } from '../../platform/appHistory'
 
 export function LibraryScreen({
   library,
   onRead,
+  onSeriesChange,
   cloudReady,
   onRemoveCloud,
 }: {
   library: LibraryState
   onRead: (book: BookMetadata) => void
+  onSeriesChange: (name: string | null) => void
   cloudReady: boolean
   onRemoveCloud: (books: LibraryBook[]) => Promise<boolean>
 }) {
@@ -39,6 +43,7 @@ export function LibraryScreen({
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [categorizing, setCategorizing] = useState<LibraryBook[] | null>(null)
   const [removing, setRemoving] = useState<LibraryBook[] | null>(null)
+  const renamedSeries = useRef<string | null | undefined>(undefined)
   const chosen = library.books.filter((b) => checked.has(b.id))
   const selected = library.books.find((book) => book.id === selectedId)
   const categories = categoriesFor(library.books)
@@ -58,6 +63,13 @@ export function LibraryScreen({
     setSelecting(false)
     setChecked(new Set())
   }
+  useBackLayer(selecting, finishSelection)
+  useEffect(() => {
+    if (selecting || seriesBooks || renamedSeries.current === undefined) return
+    const name = renamedSeries.current
+    renamedSeries.current = undefined
+    void appHistorySettled().then(() => onSeriesChange(name))
+  }, [selecting, seriesBooks, onSeriesChange])
   // Cloud originals are trashed before the shelf entry, so a failure leaves the book intact.
   async function applyRemoval(chosenBooks: LibraryBook[], mode: RemoveMode) {
     if (mode === 'download') {
@@ -93,7 +105,7 @@ export function LibraryScreen({
             className="icon-button"
             aria-label="返回全部書籍"
             onClick={() => {
-              library.setActiveSeries(null)
+              onSeriesChange(null)
               finishSelection()
             }}
           >
@@ -192,8 +204,7 @@ export function LibraryScreen({
                     books={entry.books}
                     total={library.books.filter((b) => b.series === entry.name).length}
                     onOpen={() => {
-                      library.setActiveSeries(entry.name)
-                      window.scrollTo(0, 0)
+                      onSeriesChange(entry.name)
                     }}
                   />
                 )
@@ -222,7 +233,7 @@ export function LibraryScreen({
           onApply={async (name, entries) => {
             await library.bulkSeries(name, entries)
             finishSelection()
-            if (library.activeSeries) library.setActiveSeries(name.trim() || null)
+            if (library.activeSeries) renamedSeries.current = name.trim() || null
           }}
         />
       )}

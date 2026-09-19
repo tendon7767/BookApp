@@ -97,3 +97,65 @@ for (const version of ['2.0', '3.0'] as const) {
     expect(errors).toEqual([])
   })
 }
+
+test('EPUB chapter changes stay covered until the no-animation page is ready', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('./')
+  await page.getByLabel('選擇書籍檔案').setInputFiles({
+    name: 'reading.epub',
+    mimeType: 'application/epub+zip',
+    buffer: await makeReadingEpub(),
+  })
+  await page.getByRole('button', { name: '書籍資訊 午後的書頁', exact: true }).click()
+  await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
+  await expect(page.getByRole('button', { name: '閱讀選單', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '閱讀選單', exact: true }).click()
+  await page.getByRole('button', { name: '閱讀排版' }).click()
+  await page.getByRole('group', { name: '翻頁效果' }).getByRole('button', { name: '關閉' }).click()
+  await page.getByRole('button', { name: '關閉排版' }).click()
+  await expect(page.getByRole('button', { name: '返回書架' })).toBeEnabled()
+  await page.evaluate(() => {
+    const host = document.querySelector<HTMLElement>('.epub-host')!
+    const record = { insertedWhileHidden: 0, insertedWhileVisible: 0 }
+    const observer = new MutationObserver((changes) => {
+      if (
+        !changes.some((change) =>
+          [...change.addedNodes].some(
+            (node) =>
+              node instanceof HTMLIFrameElement ||
+              (node instanceof Element && node.querySelector('iframe')),
+          ),
+        )
+      )
+        return
+      if (host.style.visibility === 'hidden') record.insertedWhileHidden++
+      else record.insertedWhileVisible++
+    })
+    observer.observe(host, { childList: true, subtree: true })
+    Object.assign(window, { __readerTurnRecord: record, __readerTurnObserver: observer })
+  })
+  await page.getByRole('button', { name: '目錄', exact: true }).click()
+  await page.getByRole('button', { name: '第二章', exact: true }).click()
+  await expect
+    .poll(async () =>
+      page
+        .locator('.epub-host iframe')
+        .first()
+        .evaluate((frame: HTMLIFrameElement) =>
+          frame.contentDocument?.body?.textContent?.includes('第二章'),
+        ),
+    )
+    .toBe(true)
+  const record = await page.evaluate(() => {
+    const state = window as unknown as {
+      __readerTurnRecord: { insertedWhileHidden: number; insertedWhileVisible: number }
+      __readerTurnObserver: MutationObserver
+    }
+    state.__readerTurnObserver.disconnect()
+    return state.__readerTurnRecord
+  })
+  expect(record.insertedWhileHidden).toBeGreaterThan(0)
+  expect(record.insertedWhileVisible).toBe(0)
+  await expect(page.locator('.epub-host')).toHaveCSS('visibility', 'visible')
+  await expect(page.locator('.reader-page')).toHaveCSS('transform', 'none')
+})

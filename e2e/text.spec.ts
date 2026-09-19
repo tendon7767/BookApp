@@ -212,9 +212,30 @@ test('a swipe follows the finger, turns the page past the threshold and springs 
   expect(await drag(290)).toMatch(/translate3d\(-?\d/)
   await expect.poll(transform).toBe('')
   expect(await savedOffset(page)).toBe(first)
+  // A browser-cancelled gesture returns through the same spring-back path.
+  expect(await drag(80, false)).toMatch(/translate3d\(-\d/)
+  await surface.dispatchEvent('pointercancel')
+  await expect(sheet).toHaveCSS('transition-duration', '0.18s')
+  await page.mouse.up()
+  await expect.poll(transform).toBe('')
+  expect(await savedOffset(page)).toBe(first)
   // Past the threshold the drag completes into the next page.
+  await page.evaluate(() => {
+    const host = document.querySelector('.text-host')!
+    const sheet = document.querySelector<HTMLElement>('.reader-page')!
+    const observer = new MutationObserver(() => {
+      Object.assign(window, { __textTurnOpacity: sheet.style.opacity })
+      observer.disconnect()
+    })
+    observer.observe(host, { attributes: true, attributeFilter: ['data-start'] })
+  })
   expect(await drag(80)).toMatch(/translate3d\(-\d/)
   await expect.poll(async () => await savedOffset(page)).toBeGreaterThan(first)
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __textTurnOpacity: string }).__textTurnOpacity,
+    ),
+  ).toBe('0')
   await expect.poll(transform).toBe('')
   // Dragging back returns to the previous page.
   await page.mouse.move(80, 430)

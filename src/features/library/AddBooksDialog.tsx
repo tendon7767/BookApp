@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Cloud, FolderOpen, X } from 'lucide-react'
+import { useBackLayer } from '../../platform/useBackLayer'
 
 export function AddBooksDialog({
   onLocal,
@@ -11,6 +12,7 @@ export function AddBooksDialog({
   onClose: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  useBackLayer(true, onClose)
   useEffect(() => {
     const element = dialog.current
     element?.showModal()
