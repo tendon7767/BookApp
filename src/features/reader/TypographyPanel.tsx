@@ -156,8 +156,8 @@ export function TypographyPanel({
             </button>
           ))}
         </div>
-        <div className="tap-zone-options" role="group" aria-label="點按翻頁區域">
-          <span>點按翻頁</span>
+        <div className="tap-zone-options" role="group" aria-label="翻頁方向">
+          <span>翻頁方向</span>
           <button
             aria-pressed={settings.tapZones === 'horizontal'}
             onClick={() => change({ tapZones: 'horizontal' })}

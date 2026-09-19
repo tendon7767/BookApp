@@ -643,10 +643,12 @@ button.book-card-title:active {
   color: white;
   font-size: var(--text-meta);
 }
+/* Pages stacked behind the cover: the layers peek out on the spine side only,
+   so they stay inside the card instead of leaning over the neighbouring book. */
 .series-card .book-cover-wrap {
   box-shadow:
-    3px -3px 0 var(--border),
-    6px -6px 0 var(--accent-soft);
+    4px 0 0 -2px var(--border),
+    8px 0 0 -4px var(--accent-soft);
   overflow: visible;
 }
 .series-caption {

@@ -74,10 +74,11 @@ for (const version of ['2.0', '3.0'] as const) {
     await page.mouse.click(viewport.width - 30, viewport.height / 2)
     await expect.poll(async () => (await progress(page))?.location.cfi).not.toBe(beforeTap)
     const afterTap = (await progress(page))!.location.cfi
-    // Exercise the same pointer gesture path used by a touch swipe.
-    await page.mouse.move(viewport.width * 0.7, viewport.height / 2)
+    // Exercise the same pointer gesture path used by a touch swipe. Swiping back is
+    // the deterministic direction here: the tap above just moved a page forward.
+    await page.mouse.move(viewport.width * 0.3, viewport.height / 2)
     await page.mouse.down()
-    await page.mouse.move(viewport.width * 0.3, viewport.height / 2, { steps: 5 })
+    await page.mouse.move(viewport.width * 0.7, viewport.height / 2, { steps: 5 })
     await page.mouse.up()
     await expect.poll(async () => (await progress(page))?.location.cfi).not.toBe(afterTap)
     const beforeResize = (await progress(page))!.percentage

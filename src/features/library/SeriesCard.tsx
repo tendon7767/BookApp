@@ -17,7 +17,11 @@ export function SeriesCard({
   const first = orderVolumes(books)[0]!
   return (
     <div className="book-card-wrap">
-      <button className="book-card series-card" aria-label={`開啟系列 ${name}`} onClick={onOpen}>
+      <button
+        className="book-card book-card-cover series-card"
+        aria-label={`開啟系列 ${name}`}
+        onClick={onOpen}
+      >
         <span className="book-cover-wrap">
           <BookCover book={{ ...first, title: name }} />
           <span className="series-badge">
@@ -25,7 +29,10 @@ export function SeriesCard({
             {books.length === total ? `${total} 本` : `${books.length}/${total} 本符合`}
           </span>
         </span>
-        <span className="book-card-title">{name}</span>
+      </button>
+      {/* Mirrors a book card so the titles line up; the cover button carries the name. */}
+      <button className="book-card-title" aria-hidden="true" tabIndex={-1} onClick={onOpen}>
+        {name}
       </button>
     </div>
   )

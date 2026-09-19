@@ -25,7 +25,7 @@ const labels: Record<string, string> = {
   margin: '邊距',
   textColor: '文字顏色',
   backgroundColor: '背景顏色',
-  tapZones: '點按翻頁區域',
+  tapZones: '翻頁方向',
 }
 function valueLabel(value: Json): string {
   if (value === true) return '保留'

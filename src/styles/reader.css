@@ -534,15 +534,15 @@
   inset: 0;
 }
 .reader-flip-a {
-  animation: reader-flip-a 230ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: reader-flip-a 170ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .reader-flip-b {
-  animation: reader-flip-b 230ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: reader-flip-b 170ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 @keyframes reader-flip-a {
   from {
     transform: translate(var(--flip-dx, 0), var(--flip-dy, 0));
-    opacity: 0.25;
+    opacity: 0.45;
   }
   to {
     transform: none;
@@ -552,7 +552,7 @@
 @keyframes reader-flip-b {
   from {
     transform: translate(var(--flip-dx, 0), var(--flip-dy, 0));
-    opacity: 0.25;
+    opacity: 0.45;
   }
   to {
     transform: none;

@@ -111,50 +111,50 @@ export function ReaderView({
     if (next.tapZones !== zones) setHint(true)
     reader.updateSettings(next)
   }
-  // The turn animation plays on the page that just arrived, so it waits for the engine.
+  // Tapping and the keyboard turn the page outright; only a swipe is animated.
   function act(gesture: 'next' | 'previous' | 'toggle') {
-    const result = reader.act(gesture)
-    if (gesture === 'toggle' || reader.readingSettings.pageAnimation === 'none')
-      return void Promise.resolve(result)
-    void Promise.resolve(result).then(() =>
-      setFlip((previous) => ({ gesture, count: (previous?.count ?? 0) + 1 })),
-    )
+    void Promise.resolve(reader.act(gesture))
   }
   const sliding = reader.readingSettings.pageAnimation !== 'none'
   function shift(offset: number, duration = 0) {
     const element = page.current
     if (!element) return
     element.style.transition = duration ? `transform ${duration}ms ease-out` : 'none'
-    element.style.transform = offset ? `translate3d(${offset}px, 0, 0)` : ''
+    element.style.transform = offset
+      ? zones === 'vertical'
+        ? `translate3d(0, ${offset}px, 0)`
+        : `translate3d(${offset}px, 0, 0)`
+      : ''
   }
   // The page follows the finger; an edge resists instead of opening a gap.
-  function dragMove(dx: number) {
+  function dragMove(delta: number) {
     if (turning.current) return
     // A running turn animation would otherwise outrank the inline transform.
     if (flip) setFlip(null)
-    const blocked = dx > 0 ? reader.position?.atStart : reader.position?.atEnd
-    shift(blocked ? dx / 4 : dx)
+    const blocked = delta > 0 ? reader.position?.atStart : reader.position?.atEnd
+    shift(blocked ? delta / 4 : delta)
   }
-  function dragEnd(dx: number, width: number) {
+  function dragEnd(delta: number, size: number) {
     if (turning.current) return
-    const gesture = dx < 0 ? 'next' : 'previous'
-    const blocked = dx > 0 ? reader.position?.atStart : reader.position?.atEnd
-    if (blocked || reader.busy || Math.abs(dx) < Math.max(56, width * 0.2)) {
+    const gesture = delta < 0 ? 'next' : 'previous'
+    // Only the distance decides here: the reported position can lag a turn behind,
+    // and the engine itself refuses to move past the first or last page.
+    if (Math.abs(delta) < Math.max(56, size * 0.2)) {
       shift(0, 180)
       return
     }
-    // Finish the drag off-screen first; the arriving page then slides in from the other side.
+    // The engine swaps pages while the drag finishes, so the gap is only as long
+    // as the swap itself, and part of the old page stays on screen throughout.
     turning.current = true
-    shift(dx < 0 ? -width : width, 130)
-    setTimeout(() => {
-      void Promise.resolve(reader.act(gesture)).finally(() => {
-        shift(0)
-        turning.current = false
-        setFlip((previous) => ({ gesture, count: (previous?.count ?? 0) + 1 }))
-      })
-    }, 130)
+    const swap = Promise.resolve(reader.act(gesture)).catch(() => undefined)
+    shift(delta < 0 ? -size * 0.6 : size * 0.6, 90)
+    void Promise.all([new Promise((resolve) => setTimeout(resolve, 90)), swap]).then(() => {
+      shift(0)
+      turning.current = false
+      setFlip((previous) => ({ gesture, count: (previous?.count ?? 0) + 1 }))
+    })
   }
-  const flipOffset = flip?.gesture === 'previous' ? '-24px' : '24px'
+  const flipOffset = flip?.gesture === 'previous' ? '-40px' : '40px'
   const percentage = reader.position?.percentage
   const label = percentage == null ? '計算進度中…' : `${Math.round(percentage * 100)}%`
   const colors = readingColors(reader.readingSettings)
@@ -233,7 +233,7 @@ export function ReaderView({
       </div>
       {reader.ready && (
         <ReaderGestures
-          tapZones={zones}
+          axis={zones}
           onGesture={act}
           onDragMove={sliding ? dragMove : undefined}
           onDragEnd={sliding ? dragEnd : undefined}
@@ -345,7 +345,7 @@ export function ReaderView({
           )}
           {extraControls}
           <button className="reader-hint" aria-label="顯示點按區域" onClick={() => setHint(true)}>
-            {zones === 'vertical' ? '上下點按' : '左右點按'} · 左右滑動翻頁 · 點中央開關選單
+            {zones === 'vertical' ? '上下點按或上下滑動' : '左右點按或左右滑動'} · 點中央開關選單
           </button>
         </footer>
       )}
