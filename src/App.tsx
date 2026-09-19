@@ -122,7 +122,12 @@ export default function App() {
       </header>
       <main id="main" tabIndex={-1} className={screen === 'library' ? 'library-main' : undefined}>
         {screen === 'library' ? (
-          <LibraryScreen library={library} onRead={(book) => void openBook(book)} />
+          <LibraryScreen
+            library={library}
+            onRead={(book) => void openBook(book)}
+            cloudReady={cloud.connected && !!cloud.target}
+            onRemoveCloud={(books) => cloud.purgeOriginals(books)}
+          />
         ) : screen === 'cloud' ? (
           <CloudLibraryScreen cloud={cloud} online={status.online} />
         ) : screen === 'storage' ? (

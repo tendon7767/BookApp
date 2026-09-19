@@ -48,7 +48,20 @@ test('series can be assigned in bulk, searched, ordered, edited and read offline
     await expect(page.locator('.book-card')).toHaveCount(1)
     await page.getByRole('button', { name: '清除搜尋', exact: true }).click()
     await expect(page.locator('.book-card-title')).toHaveText(['序曲', '遠行', '番外'])
-    await page.getByRole('button', { name: '開啟 序曲', exact: true }).click()
+    // The series page keeps its own sort, which survives a reload.
+    await page.getByRole('combobox', { name: '系列排序' }).selectOption('volumeDesc')
+    await expect(page.locator('.book-card-title')).toHaveText(['番外', '遠行', '序曲'])
+    await page.reload()
+    await page.getByRole('button', { name: '開啟系列 山城故事', exact: true }).click()
+    await expect(page.locator('.book-card-title')).toHaveText(['番外', '遠行', '序曲'])
+    await page.getByRole('combobox', { name: '系列排序' }).selectOption('volume')
+    await expect(page.locator('.book-card-title')).toHaveText(['序曲', '遠行', '番外'])
+    // Tapping the title starts reading; tapping the cover opens the details sheet.
+    await page.getByRole('button', { name: '閱讀 遠行', exact: true }).click()
+    await expect(page.locator('.text-page')).toBeVisible()
+    await page.getByRole('button', { name: '閱讀選單', exact: true }).click()
+    await page.getByRole('button', { name: '返回書架', exact: true }).click()
+    await page.getByRole('button', { name: '書籍資訊 序曲', exact: true }).click()
     await page.getByRole('button', { name: '編輯書籍資訊', exact: true }).click()
     await expect(page.getByLabel('系列', { exact: true })).toHaveValue('山城故事')
     await page.getByLabel('集數', { exact: true }).fill('1')
@@ -56,7 +69,7 @@ test('series can be assigned in bulk, searched, ordered, edited and read offline
     await page.getByRole('button', { name: '關閉書籍資訊', exact: true }).click()
     await stop()
     stopped = true
-    await page.getByRole('button', { name: '開啟 序曲', exact: true }).click()
+    await page.getByRole('button', { name: '書籍資訊 序曲', exact: true }).click()
     await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
     await expect(page.locator('.text-page')).toBeVisible()
     // Reveal controls through the reader's accessible menu.

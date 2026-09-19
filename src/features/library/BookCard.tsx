@@ -8,6 +8,7 @@ export function BookCard({
   checked,
   onToggle,
   onInfo,
+  onRead,
   showVolume,
 }: {
   book: LibraryBook
@@ -15,14 +16,16 @@ export function BookCard({
   checked: boolean
   onToggle: () => void
   onInfo: () => void
+  onRead: () => void
   showVolume: boolean
 }) {
+  const readable = book.format === 'epub' || book.format === 'txt'
   return (
-    <div className="book-card-wrap">
+    <div className={`book-card-wrap${selecting && checked ? ' is-selected' : ''}`}>
       <button
-        className="book-card"
+        className="book-card book-card-cover"
         onClick={() => (selecting ? onToggle() : onInfo())}
-        aria-label={`${selecting ? '選取' : '開啟'} ${book.title}`}
+        aria-label={`${selecting ? '選取' : '書籍資訊'} ${book.title}`}
         aria-pressed={selecting ? checked : undefined}
       >
         <span className="book-cover-wrap">
@@ -45,17 +48,27 @@ export function BookCard({
               className={`book-selection-mark${checked ? ' is-selected' : ''}`}
               aria-hidden="true"
             >
-              {checked && <Check size={18} />}
+              {checked && <Check size={17} strokeWidth={3} />}
             </span>
           )}
         </span>
-        <span className="book-card-title">{book.title}</span>
-        {showVolume && (
-          <span className="series-caption">
-            {book.volume != null ? '第 ' + book.volume + ' 集' : '未編集數'}
-          </span>
-        )}
       </button>
+      <button
+        className="book-card-title"
+        // Tapping the cover opens the details sheet; the title starts reading straight away.
+        onClick={() => (selecting ? onToggle() : readable ? onRead() : onInfo())}
+        // While selecting, the cover button already carries the name and pressed state.
+        aria-hidden={selecting || undefined}
+        tabIndex={selecting ? -1 : undefined}
+        aria-label={selecting ? undefined : `${readable ? '閱讀' : '書籍資訊'} ${book.title}`}
+      >
+        {book.title}
+      </button>
+      {showVolume && (
+        <span className="series-caption">
+          {book.volume != null ? '第 ' + book.volume + ' 集' : '未編集數'}
+        </span>
+      )}
     </div>
   )
 }

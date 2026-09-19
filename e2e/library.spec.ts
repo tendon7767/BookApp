@@ -22,8 +22,10 @@ test('imports EPUB 2, EPUB 3 and TXT, deduplicates renamed files and deletes onl
   ])
   await expect(page.getByText('3 本書', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '加入書籍', exact: true })).toBeEnabled()
-  const card = page.getByRole('button', { name: '開啟 午後的書頁', exact: true })
-  const cover = page.getByRole('button', { name: '開啟 午後的書頁', exact: true }).locator('img')
+  const card = page.getByRole('button', { name: '書籍資訊 午後的書頁', exact: true })
+  const cover = page
+    .getByRole('button', { name: '書籍資訊 午後的書頁', exact: true })
+    .locator('img')
   await expect(cover).toBeVisible()
   await expect
     .poll(() => cover.evaluate((image: HTMLImageElement) => image.naturalWidth))
@@ -43,17 +45,17 @@ test('imports EPUB 2, EPUB 3 and TXT, deduplicates renamed files and deletes onl
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('看書測試作者')
   await expect(dialog).toContainText('afternoon.epub')
-  await dialog.getByRole('button', { name: '從書架刪除' }).click()
+  await dialog.getByRole('button', { name: '刪除書籍' }).click()
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   await expect(card).toBeAttached()
-  await dialog.getByRole('button', { name: '從書架刪除' }).click()
+  await dialog.getByRole('button', { name: '刪除書籍' }).click()
   await dialog.getByRole('button', { name: '確認刪除 1 本', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   await expect(page.getByText('2 本書', { exact: true })).toBeVisible()
   await expect(card).toHaveCount(0)
   await page.reload()
-  await expect(page.getByRole('button', { name: '開啟 微光之間' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '開啟 長夜的旅人' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '書籍資訊 微光之間' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '書籍資訊 長夜的旅人' })).toBeVisible()
 })
 
 test('a failed file does not stop the batch and an 8 MB TXT is stored byte-for-byte', async ({
@@ -133,7 +135,7 @@ test('imports an EPUB for the first time after the origin is stopped and retains
     const reopened = await context.newPage()
     await page.close()
     await reopened.goto(url)
-    const book = reopened.getByRole('button', { name: '開啟 離線的故事' })
+    const book = reopened.getByRole('button', { name: '書籍資訊 離線的故事' })
     await expect(book).toBeVisible()
     await expect(book.locator('img')).toBeVisible()
     // The reader chunk has never been requested online; it must be in the shell cache.
@@ -153,7 +155,7 @@ test('imports an EPUB for the first time after the origin is stopped and retains
       '21px',
     )
     await reopened.getByRole('button', { name: '返回書架', exact: true }).click()
-    await reopened.getByRole('button', { name: '開啟 離線的故事', exact: true }).click()
+    await reopened.getByRole('button', { name: '書籍資訊 離線的故事', exact: true }).click()
     await reopened.getByRole('button', { name: '編輯書籍資訊', exact: true }).click()
     await reopened.getByRole('textbox', { name: '書名', exact: true }).fill('離線改名')
     await reopened.getByLabel('分類', { exact: true }).fill('離線收藏')
@@ -161,8 +163,10 @@ test('imports an EPUB for the first time after the origin is stopped and retains
     await reopened.getByRole('button', { name: '關閉書籍資訊', exact: true }).click()
     await reopened.reload()
     await reopened.getByRole('searchbox', { name: '搜尋書籍' }).fill('離線收藏')
-    await expect(reopened.getByRole('button', { name: '開啟 離線改名', exact: true })).toBeVisible()
-    await reopened.getByRole('button', { name: '開啟 離線改名', exact: true }).click()
+    await expect(
+      reopened.getByRole('button', { name: '書籍資訊 離線改名', exact: true }),
+    ).toBeVisible()
+    await reopened.getByRole('button', { name: '書籍資訊 離線改名', exact: true }).click()
     await reopened.getByRole('button', { name: '開始閱讀', exact: true }).click()
     await expect(reopened.frameLocator('.epub-host iframe').locator('p').first()).toHaveCSS(
       'font-size',

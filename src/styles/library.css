@@ -210,12 +210,24 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  width: 100%;
   margin-top: 8px;
+  padding: 0;
   height: 4.5em;
+  text-align: left;
+  background: transparent;
+  border-radius: 6px;
   font-size: var(--text-body);
   font-weight: 600;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+button.book-card-title:active {
+  color: var(--accent);
+}
+.book-card-cover {
+  padding: 0;
+  background: transparent;
 }
 .book-card-author {
   display: block;
@@ -251,15 +263,22 @@
   margin: 0 0 16px;
 }
 .library-search {
-  height: 44px;
+  height: 46px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding-left: 12px;
   border: 1px solid var(--border);
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: var(--field-radius);
   color: var(--muted);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.library-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .library-search input {
   min-width: 0;
@@ -267,6 +286,7 @@
   width: 100%;
   min-height: 42px;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--ink);
   font-size: var(--text-section);
@@ -274,6 +294,9 @@
 }
 .library-search input::-webkit-search-cancel-button {
   display: none;
+}
+.library-search input:focus-visible {
+  box-shadow: none;
 }
 .library-filter-row {
   display: flex;
@@ -284,13 +307,6 @@
   flex: 1;
   min-width: 0;
   width: 0;
-  min-height: 44px;
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  color: var(--ink);
-  background: var(--surface);
-  font-size: var(--text-section);
 }
 .library-results {
   margin: -8px 0 16px;
@@ -325,13 +341,6 @@
   font-size: var(--text-body);
 }
 .book-edit-form input {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px;
-  font-size: var(--text-section);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--ink);
   background: var(--bg);
 }
 .edit-book-button {
@@ -343,8 +352,8 @@
   margin-top: 8px;
 }
 .book-detail-cover {
-  width: 120px;
-  margin: 4px auto 20px;
+  width: min(210px, 58%);
+  margin: 6px auto 22px;
 }
 .book-dialog .sheet-body > h2 {
   overflow-wrap: anywhere;
@@ -440,11 +449,18 @@
   min-width: 0;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 0 4px 0 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--field-radius);
   background: var(--surface);
   color: var(--accent);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.library-select:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .library-select > svg {
   flex-shrink: 0;
@@ -452,9 +468,17 @@
 .library-select select {
   min-height: 42px;
   border: 0;
-  padding: 4px 0;
-  background: transparent;
+  padding: 4px 28px 4px 0;
+  background-color: transparent;
+  background-position: right 6px center;
   font-size: var(--text-body);
+}
+.library-select select:focus-visible {
+  box-shadow: none;
+}
+.series-sort {
+  flex: 0 1 auto;
+  max-width: 190px;
 }
 .library-summary {
   display: flex;
@@ -556,23 +580,34 @@
 }
 .book-selection-mark {
   position: absolute;
-  top: 7px;
-  right: 7px;
+  top: 8px;
+  right: 8px;
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 2px solid #fff;
-  background: #14261dc9;
+  border: 1.5px solid #ffffffd0;
+  background: #101a1440;
+  box-shadow: 0 1px 4px #0000004d;
   display: grid;
   place-items: center;
   color: #fff;
+  transition:
+    transform 0.16s ease,
+    background 0.16s ease;
 }
 .book-selection-mark.is-selected {
-  background: #436d47;
+  background: var(--accent);
+  border-color: #fff;
+  transform: scale(1.08);
 }
-.book-card[aria-pressed='true'] .book-cover-wrap {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
+.book-card-wrap.is-selected .book-cover-wrap {
+  box-shadow: 0 0 0 3px var(--accent);
+}
+.book-card-wrap.is-selected .book-cover {
+  filter: brightness(0.93);
+}
+.book-card-wrap.is-selected .book-card-title {
+  color: var(--accent);
 }
 .bulk-book-list {
   margin: 12px 0;
@@ -678,4 +713,39 @@
 }
 .book-dialog-editing .sheet-body > h2 {
   padding-left: 0;
+}
+
+.remove-options {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 4px;
+}
+.remove-option {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--field-radius);
+  background: var(--bg);
+}
+.remove-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.remove-option.is-disabled {
+  opacity: 0.55;
+}
+.remove-option strong {
+  display: block;
+  font-size: var(--text-body);
+  line-height: 1.6;
+}
+.remove-option small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: var(--text-meta);
+  line-height: 1.7;
 }

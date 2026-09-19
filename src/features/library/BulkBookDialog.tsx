@@ -3,13 +3,11 @@ import { X } from 'lucide-react'
 import type { LibraryBook } from '../../domain/book'
 
 export function BulkBookDialog({
-  kind,
   books,
   categories,
   onApply,
   onClose,
 }: {
-  kind: 'category' | 'remove'
   books: LibraryBook[]
   categories: string[]
   onApply: (category: string) => Promise<void>
@@ -64,7 +62,7 @@ export function BulkBookDialog({
         >
           <X size={22} />
         </button>
-        <h2 id="bulk-title">{kind === 'category' ? '批次分類' : '刪除所選書籍'}</h2>
+        <h2 id="bulk-title">批次分類</h2>
         <p>已選 {books.length} 本書</p>
         <ul className="bulk-book-list">
           {books.map((b) => (
@@ -78,32 +76,24 @@ export function BulkBookDialog({
             void submit()
           }}
         >
-          {kind === 'category' ? (
-            <>
-              <label>
-                分類
-                <input
-                  autoFocus
-                  maxLength={60}
-                  list="bulk-categories"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="輸入或選擇分類"
-                  disabled={busy}
-                />
-              </label>
-              <datalist id="bulk-categories">
-                {categories.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-              <p className="quiet-note">留白會將所選書籍設為未分類。</p>
-            </>
-          ) : (
-            <p className="quiet-note">
-              將從書架刪除所選書籍、閱讀進度與排版設定。若已啟用雲端同步，其他裝置也會同步刪除；已同步的書籍可在雲端設定中找回。自行保留的原始檔案不受影響。
-            </p>
-          )}
+          <label>
+            分類
+            <input
+              autoFocus
+              maxLength={60}
+              list="bulk-categories"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="輸入或選擇分類"
+              disabled={busy}
+            />
+          </label>
+          <datalist id="bulk-categories">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+          <p className="quiet-note">留白會將所選書籍設為未分類。</p>
           {error && (
             <p className="inline-warning" role="alert">
               {error}
@@ -113,12 +103,8 @@ export function BulkBookDialog({
             <button type="button" className="secondary-button" onClick={onClose} disabled={busy}>
               取消
             </button>
-            <button
-              type="submit"
-              className={kind === 'remove' ? 'danger-button' : 'primary-button'}
-              disabled={busy}
-            >
-              {busy ? '處理中…' : kind === 'category' ? '套用分類' : `確認刪除 ${books.length} 本`}
+            <button type="submit" className="primary-button" disabled={busy}>
+              {busy ? '處理中…' : '套用分類'}
             </button>
           </div>
         </form>

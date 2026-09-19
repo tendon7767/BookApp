@@ -101,12 +101,12 @@ export async function writePreferences(preferences: AppPreferences): Promise<voi
   }
 }
 
-export async function writeLibrarySort(librarySort: NonNullable<AppPreferences['librarySort']>) {
+export async function writeShelfSort(patch: Pick<AppPreferences, 'librarySort' | 'seriesSort'>) {
   const db = await openReaderDatabase()
   try {
     const tx = db.transaction('preferences', 'readwrite')
     const current = parsePreferences(await tx.store.get('app'))
-    await tx.store.put({ ...current, librarySort }, 'app')
+    await tx.store.put({ ...current, ...patch }, 'app')
     await tx.done
   } finally {
     db.close()

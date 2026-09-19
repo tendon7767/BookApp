@@ -3,9 +3,8 @@ import { Check, Trash2, X } from 'lucide-react'
 import type { BookEdits, LibraryBook } from '../../domain/book'
 import { BookCover } from './BookCover'
 import { BookMetadataForm } from './BookMetadataForm'
-import { BulkBookDialog } from './BulkBookDialog'
+import { RemoveBooksDialog, type RemoveMode } from './RemoveBooksDialog'
 import { progressLabel } from './libraryView'
-import { removeBookDownload } from '../../storage/bookRepository'
 
 function formatFileSize(bytes: number): string {
   return bytes >= 1024 * 1024
@@ -20,14 +19,16 @@ export function BookDetails({
   onRead,
   categories,
   seriesNames,
+  cloudReady,
   onSave,
 }: {
   book: LibraryBook
   categories: string[]
   seriesNames: string[]
+  cloudReady: boolean
   onSave: (id: string, edits: BookEdits) => Promise<void>
   onClose: () => void
-  onRemove: (id: string) => Promise<void>
+  onRemove: (mode: RemoveMode) => Promise<void>
   onRead: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
@@ -61,13 +62,12 @@ export function BookDetails({
   }
   if (confirming)
     return (
-      <BulkBookDialog
-        kind="remove"
+      <RemoveBooksDialog
         books={[book]}
-        categories={categories}
+        cloudReady={cloudReady}
         onClose={() => setConfirming(false)}
-        onApply={async () => {
-          await onRemove(book.id)
+        onApply={async (mode) => {
+          await onRemove(mode)
           onClose()
         }}
       />
@@ -90,7 +90,7 @@ export function BookDetails({
         {!editing && (
           <button
             className="icon-button delete-book-icon"
-            aria-label="從書架刪除"
+            aria-label="刪除書籍"
             onClick={() => setConfirming(true)}
           >
             <Trash2 size={22} />
@@ -180,26 +180,6 @@ export function BookDetails({
                 ? '原檔已有雲端副本；最新設定的同步狀態請至設定查看。'
                 : '尚未備份原檔，請保留原始檔案。'}
             </p>
-            {book.cloudSource && book.downloaded !== false && (
-              <button
-                className="secondary-button full-width"
-                disabled={busy}
-                onClick={() => {
-                  setSaving(true)
-                  void removeBookDownload(book.id)
-                    .then(() => {
-                      window.dispatchEvent(new Event('kanshu-restored'))
-                      onClose()
-                    })
-                    .catch(() => {
-                      setError('無法移除下載，請重試。')
-                      setSaving(false)
-                    })
-                }}
-              >
-                僅移除本機下載（保留進度）
-              </button>
-            )}
           </>
         )}
         {error && (

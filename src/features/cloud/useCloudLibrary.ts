@@ -12,8 +12,11 @@ import {
 } from './types'
 import { conflicts, equal, materialize, type Json, type SyncState } from './syncModel'
 import {
+  adoptCloudOriginal,
   downloadBook,
   fingerprint,
+  isCloudBookFile,
+  purgeCloudOriginals,
   loadSnapshot,
   resolveConflict,
   restoreSnapshot,
@@ -21,7 +24,14 @@ import {
   targetKey,
   withSyncLock,
 } from './syncEngine'
+import { importBook, MAX_IMPORT_BYTES } from '../import/importBook'
 import type { BookMetadata } from '../../domain/book'
+
+export interface CloudCandidate {
+  id: string
+  name: string
+  size: number
+}
 
 export function useCloudLibrary(
   active: boolean,
@@ -38,6 +48,7 @@ export function useCloudLibrary(
   const [busy, setBusy] = useState('')
   const [state, setState] = useState<SyncState>()
   const [history, setHistory] = useState<RemoteEntry[]>([])
+  const [candidates, setCandidates] = useState<CloudCandidate[] | null>(null)
   const [expiresAt, setExpiresAt] = useState(0)
   const session = useRef<{ token: string; expiresAt: number } | null>(null)
   const operation = useRef<AbortController | null>(null)
@@ -305,6 +316,74 @@ export function useCloudLibrary(
       setNotice('已還原此版本的書籍與設定；此版本以後加入的書籍仍保留。還原結果將再同步。')
     })
   }
+  // Cloud-only cleanup: the shelf entry is removed by the caller once this succeeds.
+  async function purgeOriginals(books: BookMetadata[]) {
+    const hashes = books.filter((book) => book.cloudSource).map((book) => book.fileHash)
+    if (!hashes.length) return true
+    if (!target || !session.current) {
+      setError('請先連接 Google Drive，再刪除雲端原檔。')
+      return false
+    }
+    return run('正在刪除雲端原檔…', async (signal) => {
+      const done = await withSyncLock(() =>
+        purgeCloudOriginals(client(), target, hashes, signal).then(() => true),
+      )
+      if (!done) throw new Error('另一個「看書」視窗正在同步，請稍後重試。')
+      nextAttempt.current = 0
+      setNotice('雲端原檔已移到 Google Drive 垃圾桶，可在 Drive 內復原。')
+    })
+  }
+  function scanNewBooks() {
+    if (!target) return
+    return run('正在查詢雲端新書…', async (signal) => {
+      const found = (await client().entries(target.id, signal))
+        .filter(isCloudBookFile)
+        .map((entry) => ({ id: entry.id, name: entry.name, size: Number(entry.size ?? 0) }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'))
+      setCandidates(found)
+      setNotice(
+        found.length
+          ? `在備份資料夾找到 ${found.length} 個尚未加入的檔案。`
+          : '備份資料夾沒有未加入的 EPUB／TXT 檔案。',
+      )
+    })
+  }
+  async function importCloudBooks(chosen: CloudCandidate[]) {
+    if (!target || !session.current) {
+      setError('請先連接 Google Drive，再加入雲端新書。')
+      return false
+    }
+    const results: string[] = []
+    const done = await run('正在加入雲端新書…', async (signal) => {
+      const completed = await withSyncLock(async () => {
+        const drive = client()
+        for (const [index, entry] of chosen.entries()) {
+          setBusy(`${index + 1}/${chosen.length} · 正在下載「${entry.name}」…`)
+          if (entry.size > MAX_IMPORT_BYTES) {
+            results.push(`${entry.name}：超過 50 MB，未加入`)
+            continue
+          }
+          try {
+            const blob = await drive.blob(entry.id, MAX_IMPORT_BYTES, signal)
+            const result = await importBook(new File([blob], entry.name))
+            await adoptCloudOriginal(drive, target, result.book.fileHash, entry.id, signal)
+            results.push(`${entry.name}：${result.added ? '已加入書架' : '書架已有相同內容'}`)
+          } catch (cause) {
+            if (signal.aborted) throw cause
+            results.push(`${entry.name}：${cause instanceof Error ? cause.message : '加入失敗'}`)
+          }
+        }
+        return true
+      })
+      if (!completed) throw new Error('另一個「看書」視窗正在同步，請稍後重試。')
+      setCandidates(null)
+      nextAttempt.current = 0
+      await reloadLibrary()
+      window.dispatchEvent(new Event('kanshu-restored'))
+    })
+    if (results.length) setNotice(results.join('\n'))
+    return done
+  }
   async function ensureDownloaded(book: BookMetadata) {
     if (book.downloaded !== false) return true
     if (!preferences.account || !session.current) {
@@ -372,6 +451,11 @@ export function useCloudLibrary(
     restore,
     ensureDownloaded,
     downloadBooks,
+    purgeOriginals,
+    candidates,
+    scanNewBooks,
+    importCloudBooks,
+    clearCandidates: () => setCandidates(null),
     cancel: () => operation.current?.abort(),
     retrySdk: () => setSdkAttempt((n) => n + 1),
   }

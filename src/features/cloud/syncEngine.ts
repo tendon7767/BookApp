@@ -27,6 +27,63 @@ export interface SyncTarget {
   name: string
 }
 export const targetKey = (target: SyncTarget) => `${target.accountId}:${target.id}`
+export const DATA_FOLDER = '備份資料'
+export const SNAPSHOTS_PER_DEVICE = 10
+const FOLDER_MIME = 'application/vnd.google-apps.folder'
+const isData = (entry: RemoteEntry) =>
+  entry.mimeType === FOLDER_MIME && entry.appProperties?.kanshu === 'data-v1'
+export const isCloudBookFile = (entry: RemoteEntry) =>
+  entry.mimeType !== FOLDER_MIME &&
+  /\.(epub|txt)$/i.test(entry.name) &&
+  entry.appProperties?.kanshu !== 'book-v1'
+
+// The shelf folder holds book originals only; snapshots and covers live in a subfolder,
+// so dropping a new book into the folder stays unambiguous.
+async function dataFolder(
+  drive: SyncDrive,
+  target: SyncTarget,
+  entries: RemoteEntry[],
+  signal: AbortSignal,
+) {
+  const folders = entries
+    .filter(isData)
+    .sort(
+      (a, b) =>
+        (a.createdTime ?? '').localeCompare(b.createdTime ?? '') || a.id.localeCompare(b.id),
+    )
+  const primary =
+    folders[0] ?? (await drive.createFolder(target.id, DATA_FOLDER, { kanshu: 'data-v1' }, signal))
+  const contents: RemoteEntry[] = []
+  for (const folder of folders) contents.push(...(await drive.entries(folder.id, signal)))
+  // Older versions kept snapshots and covers beside the books; move them in once.
+  for (const entry of entries) {
+    const kind = entry.appProperties?.kanshu
+    if (kind !== 'snapshot-v1' && kind !== 'cover-v1') continue
+    await drive.move(entry.id, target.id, primary.id, signal)
+    contents.push(entry)
+  }
+  return { folder: primary, contents }
+}
+async function pruneSnapshots(drive: SyncDrive, contents: RemoteEntry[], signal: AbortSignal) {
+  const byDevice = new Map<string, RemoteEntry[]>()
+  for (const entry of contents) {
+    if (entry.appProperties?.kanshu !== 'snapshot-v1') continue
+    const device = entry.appProperties.device ?? ''
+    byDevice.set(device, [...(byDevice.get(device) ?? []), entry])
+  }
+  const stale = new Set<string>()
+  for (const group of byDevice.values())
+    for (const entry of group
+      .sort(
+        (a, b) =>
+          Number(b.appProperties!.generation) - Number(a.appProperties!.generation) ||
+          (b.createdTime ?? '').localeCompare(a.createdTime ?? ''),
+      )
+      .slice(SNAPSHOTS_PER_DEVICE))
+      stale.add(entry.id)
+  for (const id of stale) await drive.trash(id, signal)
+  return contents.filter((entry) => !stale.has(entry.id))
+}
 export const fingerprint = (state: SyncState) =>
   JSON.stringify({ document: state.document, assets: state.assets })
 export async function withSyncLock<T>(task: () => Promise<T>): Promise<T | undefined> {
@@ -63,6 +120,7 @@ export async function loadSnapshot(drive: SyncDrive, entry: RemoteEntry, signal:
 async function publishPending(
   drive: SyncDrive,
   target: SyncTarget,
+  folderId: string,
   state: SyncState,
   signal: AbortSignal,
 ) {
@@ -70,7 +128,7 @@ async function publishPending(
   const { id, snapshot } = state.pending
   await drive.upload(
     id,
-    target.id,
+    folderId,
     `書架備份-${snapshot.device}-${snapshot.generation}.json`,
     new Blob([JSON.stringify(snapshot)], { type: 'application/json' }),
     { kanshu: 'snapshot-v1', device: snapshot.device, generation: String(snapshot.generation) },
@@ -92,14 +150,16 @@ export async function synchronize(
   report: (message: string) => void,
 ) {
   const key = targetKey(target)
-  // Finish a previously committed outbox item before allocating another snapshot.
   let state = await captureLocal(key)
-  state = await publishPending(drive, target, state, signal)
   report('正在合併書架與閱讀設定…')
   const entries = await drive.entries(target.id, signal)
+  const data = await dataFolder(drive, target, entries, signal)
+  let contents = data.contents
+  // Finish a previously committed outbox item before allocating another snapshot.
+  state = await publishPending(drive, target, data.folder.id, state, signal)
   let remote = emptyDocument()
   const assets: Record<string, Asset> = {}
-  for (const entry of latestSnapshots(entries)) {
+  for (const entry of latestSnapshots(contents)) {
     const snapshot = await loadSnapshot(drive, entry, signal)
     remote = mergeDocuments(remote, snapshot.document)
     Object.assign(assets, snapshot.assets)
@@ -126,7 +186,7 @@ export async function synchronize(
       }
       await drive.upload(
         id,
-        target.id,
+        kind === 'cover-v1' ? data.folder.id : target.id,
         name,
         body,
         { kanshu: kind, hash: book.fileHash },
@@ -162,8 +222,8 @@ export async function synchronize(
     const snapshotId = state.pending.id
     await saveSyncState(key, state)
     report('正在保存書架備份…')
-    state = await publishPending(drive, target, state, signal)
-    entries.push({
+    state = await publishPending(drive, target, data.folder.id, state, signal)
+    contents.push({
       id: snapshotId,
       name: '書架備份',
       mimeType: 'application/json',
@@ -175,6 +235,7 @@ export async function synchronize(
       },
     })
   }
+  contents = await pruneSnapshots(drive, contents, signal)
   state.lastSync = Date.now()
   await saveSyncState(key, state)
   // Attach cloud locations after successful original upload without changing content positions.
@@ -194,7 +255,43 @@ export async function synchronize(
       await drive.blob(book.cloudSource.coverId, 5 * 1024 * 1024, signal),
     )
   }
-  return { state, again: fingerprint(state) !== state.published, entries }
+  return { state, again: fingerprint(state) !== state.published, entries: contents }
+}
+
+// Trashing the originals first means a failure leaves the shelf entry untouched.
+export async function purgeCloudOriginals(
+  drive: SyncDrive,
+  target: SyncTarget,
+  hashes: string[],
+  signal: AbortSignal,
+) {
+  const key = targetKey(target)
+  const state = (await readSyncState(key)) ?? (await captureLocal(key))
+  for (const hash of hashes) {
+    const asset = state.assets[hash]
+    if (!asset) continue
+    await drive.trash(asset.id, signal)
+    if (asset.coverId) await drive.trash(asset.coverId, signal)
+    delete state.assets[hash]
+    await saveSyncState(key, state)
+  }
+}
+
+// An imported drop-in file becomes this book's original instead of being uploaded again.
+export async function adoptCloudOriginal(
+  drive: SyncDrive,
+  target: SyncTarget,
+  hash: string,
+  fileId: string,
+  signal: AbortSignal,
+) {
+  await drive.mark(fileId, { kanshu: 'book-v1', hash }, signal)
+  const key = targetKey(target)
+  const state = (await readSyncState(key)) ?? (await captureLocal(key))
+  if (!state.assets[hash]) {
+    state.assets[hash] = { id: fileId }
+    await saveSyncState(key, state)
+  }
 }
 export async function resolveConflict(target: SyncTarget, field: string, value: Json) {
   return applyRemote(

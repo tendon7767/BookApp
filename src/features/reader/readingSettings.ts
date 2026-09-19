@@ -23,6 +23,7 @@ export interface ReadingSettings {
   textColor: string | null
   backgroundColor: string | null
   tapZones: 'horizontal' | 'vertical'
+  pageAnimation: 'slide' | 'none'
 }
 export const defaultReadingSettings: ReadingSettings = {
   fontFamily: 'serif',
@@ -34,6 +35,7 @@ export const defaultReadingSettings: ReadingSettings = {
   textColor: null,
   backgroundColor: null,
   tapZones: 'horizontal',
+  pageAnimation: 'slide',
 }
 function number(value: unknown, fallback: number, min: number, max: number, step: number) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
@@ -70,6 +72,7 @@ export function parseReadingSettings(
     textColor: color(data.textColor),
     backgroundColor: color(data.backgroundColor),
     tapZones: data.tapZones === 'vertical' ? 'vertical' : 'horizontal',
+    pageAnimation: data.pageAnimation === 'none' ? 'none' : 'slide',
   }
 }
 export function readingColors(settings: ReadingSettings) {

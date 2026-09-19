@@ -73,9 +73,12 @@ test('live typography preserves its anchor across repeated reflows and offline r
     mimeType: 'application/epub+zip',
     buffer: await makeReadingEpub(),
   })
-  await page.getByRole('button', { name: '開啟 午後的書頁' }).click()
+  await page.getByRole('button', { name: '書籍資訊 午後的書頁' }).click()
   await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
   const menu = page.getByRole('button', { name: '閱讀選單', exact: true })
+  // The tap zones are shown once on the first open, then fade on their own.
+  await expect(page.locator('.tap-zone-hint')).toBeVisible()
+  await expect(page.locator('.tap-zone-hint')).toHaveCount(0, { timeout: 5000 })
   await expect(menu).not.toContainText('計算')
   await menu.click()
   await page.getByRole('slider', { name: '閱讀進度' }).fill('68')
@@ -90,6 +93,11 @@ test('live typography preserves its anchor across repeated reflows and offline r
   await panel.getByRole('slider', { name: '段落間距', exact: true }).fill('1.4')
   await panel.getByRole('slider', { name: '左右邊距', exact: true }).fill('38')
   await panel.getByRole('button', { name: '深夜', exact: true }).click()
+  await panel.getByRole('button', { name: '關閉', exact: true }).click()
+  await expect(panel.getByRole('button', { name: '關閉', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
   await expect(panel.getByRole('status', { name: '目前字級' })).toHaveText('26')
   await expect.poll(async () => (await stored(page)).settings?.settings.fontSize).toBe(26)
   await panel.getByRole('button', { name: '關閉排版' }).click()
@@ -115,7 +123,7 @@ test('live typography preserves its anchor across repeated reflows and offline r
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper')
   if (browserName === 'chromium') await context.setOffline(true)
   await page.reload()
-  await page.getByRole('button', { name: '開啟 午後的書頁' }).click()
+  await page.getByRole('button', { name: '書籍資訊 午後的書頁' }).click()
   await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
   await expect(menu).toBeVisible()
   await expect(paragraph).toHaveCSS('font-size', '26px')

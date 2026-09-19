@@ -37,7 +37,7 @@ for (const version of ['2.0', '3.0'] as const) {
       mimeType: 'application/epub+zip',
       buffer: await makeReadingEpub(version),
     })
-    await page.getByRole('button', { name: '開啟 午後的書頁', exact: true }).click()
+    await page.getByRole('button', { name: '書籍資訊 午後的書頁', exact: true }).click()
     await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
     const menu = page.getByRole('button', { name: '閱讀選單', exact: true })
     await expect(menu).toBeVisible()
@@ -58,7 +58,7 @@ for (const version of ['2.0', '3.0'] as const) {
     const saved = (await progress(page))!
     if (browserName === 'chromium') await context.setOffline(true)
     await page.reload()
-    await page.getByRole('button', { name: '開啟 午後的書頁', exact: true }).click()
+    await page.getByRole('button', { name: '書籍資訊 午後的書頁', exact: true }).click()
     await page.getByRole('button', { name: '開始閱讀', exact: true }).click()
     await expect(menu).toBeVisible()
     await expect(menu).not.toContainText('計算')

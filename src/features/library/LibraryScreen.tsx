@@ -1,39 +1,54 @@
 import { useState } from 'react'
-import { ArrowLeft, SquareCheckBig } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowLeft, SquareCheckBig } from 'lucide-react'
 import type { BookMetadata, LibraryBook } from '../../domain/book'
 import type { LibraryState } from './useLibrary'
 import { BookCard } from './BookCard'
 import { SeriesCard } from './SeriesCard'
 import { SeriesDialog } from './SeriesDialog'
-import { groupSeries, orderVolumes, seriesNamesFor } from './seriesView'
+import {
+  groupSeries,
+  orderVolumes,
+  seriesNamesFor,
+  seriesSortLabels,
+  seriesSorts,
+  type SeriesSort,
+} from './seriesView'
 import { BookDetails } from './BookDetails'
 import { ImportControls } from './ImportControls'
 import { LibraryFilters } from './LibraryFilters'
 import { BulkBookDialog } from './BulkBookDialog'
 import { LibrarySelectionBar } from './LibrarySelectionBar'
 import { categoriesFor, visibleBooks } from './libraryView'
+import { RemoveBooksDialog, type RemoveMode } from './RemoveBooksDialog'
+import { removeBookDownloads } from '../../storage/bookRepository'
 
 export function LibraryScreen({
   library,
   onRead,
+  cloudReady,
+  onRemoveCloud,
 }: {
   library: LibraryState
   onRead: (book: BookMetadata) => void
+  cloudReady: boolean
+  onRemoveCloud: (books: LibraryBook[]) => Promise<boolean>
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [seriesBooks, setSeriesBooks] = useState<LibraryBook[] | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [checked, setChecked] = useState<Set<string>>(new Set())
-  const [bulk, setBulk] = useState<{ kind: 'category' | 'remove'; books: LibraryBook[] } | null>(
-    null,
-  )
+  const [categorizing, setCategorizing] = useState<LibraryBook[] | null>(null)
+  const [removing, setRemoving] = useState<LibraryBook[] | null>(null)
   const chosen = library.books.filter((b) => checked.has(b.id))
   const selected = library.books.find((book) => book.id === selectedId)
   const categories = categoriesFor(library.books)
   const seriesNames = seriesNamesFor(library.books)
   const matching = visibleBooks(library.books, library.filter)
   const books = library.activeSeries
-    ? orderVolumes(matching.filter((b) => b.series === library.activeSeries))
+    ? orderVolumes(
+        matching.filter((b) => b.series === library.activeSeries),
+        library.seriesSort,
+      )
     : matching
   const entries =
     library.activeSeries || selecting
@@ -42,6 +57,20 @@ export function LibraryScreen({
   function finishSelection() {
     setSelecting(false)
     setChecked(new Set())
+  }
+  // Cloud originals are trashed before the shelf entry, so a failure leaves the book intact.
+  async function applyRemoval(chosenBooks: LibraryBook[], mode: RemoveMode) {
+    if (mode === 'download') {
+      await removeBookDownloads(
+        chosenBooks.filter((b) => b.downloaded !== false && b.cloudSource).map((b) => b.id),
+      )
+      await library.reload()
+      window.dispatchEvent(new Event('kanshu-restored'))
+      return
+    }
+    if (mode === 'cloud' && !(await onRemoveCloud(chosenBooks)))
+      throw new Error('雲端原檔未能刪除，書籍仍保留在書架。請確認雲端連接後重試。')
+    await library.bulkRemove(chosenBooks.map((b) => b.id))
   }
   function toggle(id: string) {
     setChecked((previous) => {
@@ -72,8 +101,22 @@ export function LibraryScreen({
           </button>
           <span>
             {library.activeSeries}
-            <small>依集數排列 · {books.length} 本</small>
+            <small>{books.length} 本</small>
           </span>
+          <label className="library-select series-sort">
+            <ArrowDownWideNarrow size={18} aria-hidden="true" />
+            <select
+              aria-label="系列排序"
+              value={library.seriesSort}
+              onChange={(event) => library.setSeriesSort(event.target.value as SeriesSort)}
+            >
+              {seriesSorts.map((value) => (
+                <option key={value} value={value}>
+                  {seriesSortLabels[value]}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
       {(library.filter.query || library.filter.category !== 'all') && (
@@ -96,8 +139,8 @@ export function LibraryScreen({
               })
             }
             onSeries={() => setSeriesBooks(chosen)}
-            onCategory={() => setBulk({ kind: 'category', books: chosen })}
-            onRemove={() => setBulk({ kind: 'remove', books: chosen })}
+            onCategory={() => setCategorizing(chosen)}
+            onRemove={() => setRemoving(chosen)}
             onCancel={finishSelection}
           />
         ) : (
@@ -163,6 +206,7 @@ export function LibraryScreen({
                   checked={checked.has(book.id)}
                   onToggle={() => toggle(book.id)}
                   onInfo={() => setSelectedId(book.id)}
+                  onRead={() => onRead(book)}
                   showVolume={!!library.activeSeries}
                 />
               )
@@ -185,16 +229,27 @@ export function LibraryScreen({
           }}
         />
       )}
-      {bulk && (
+      {categorizing && (
         <BulkBookDialog
-          kind={bulk.kind}
-          books={bulk.books}
+          books={categorizing}
           categories={categories}
-          onClose={() => setBulk(null)}
+          onClose={() => setCategorizing(null)}
           onApply={async (category) => {
-            const ids = bulk.books.map((b) => b.id)
-            if (bulk.kind === 'category') await library.bulkCategory(ids, category)
-            else await library.bulkRemove(ids)
+            await library.bulkCategory(
+              categorizing.map((b) => b.id),
+              category,
+            )
+            finishSelection()
+          }}
+        />
+      )}
+      {removing && (
+        <RemoveBooksDialog
+          books={removing}
+          cloudReady={cloudReady}
+          onClose={() => setRemoving(null)}
+          onApply={async (mode) => {
+            await applyRemoval(removing, mode)
             finishSelection()
           }}
         />
@@ -205,9 +260,10 @@ export function LibraryScreen({
           book={selected}
           categories={categories}
           seriesNames={seriesNames}
+          cloudReady={cloudReady}
           onSave={library.editBook}
           onClose={() => setSelectedId(null)}
-          onRemove={library.removeBook}
+          onRemove={(mode) => applyRemoval([selected], mode)}
           onRead={() => onRead(selected)}
         />
       )}

@@ -1,4 +1,5 @@
-import { Cloud, RefreshCw, FolderOpen } from 'lucide-react'
+import { useState } from 'react'
+import { Cloud, RefreshCw, FolderOpen, Search, Plus } from 'lucide-react'
 import type { CloudLibraryState } from './useCloudLibrary'
 import { CloudConfigForm } from './CloudConfigForm'
 import type { Json } from './syncModel'
@@ -15,6 +16,8 @@ const labels: Record<string, string> = {
   core: '書籍資料',
   theme: '外觀',
   librarySort: '書架排序',
+  seriesSort: '系列排序',
+  pageAnimation: '翻頁效果',
   fontFamily: '字體',
   fontSize: '字級',
   lineHeight: '行距',
@@ -43,6 +46,10 @@ function valueLabel(value: Json): string {
     title: '書名',
     horizontal: '左右',
     vertical: '上下',
+    volume: '集數順序',
+    volumeDesc: '集數倒序',
+    slide: '滑動',
+    none: '關閉',
   }
   if (typeof value === 'string' && choices[value]) return choices[value]
   if (typeof value === 'object' && 'percentage' in value)
@@ -58,7 +65,10 @@ export function CloudLibraryScreen({
   cloud: CloudLibraryState
   online: boolean
 }) {
+  const [chosen, setChosen] = useState<Set<string>>(new Set())
   const disabled = !!cloud.busy || !online || !cloud.connected
+  const candidates = cloud.candidates ?? []
+  const selectedCandidates = candidates.filter((entry) => chosen.has(entry.id))
   const deleted = Object.entries(cloud.values).filter(
     ([key, value]) => key.endsWith('/alive') && value === false,
   )
@@ -153,6 +163,86 @@ export function CloudLibraryScreen({
         </div>
       </div>
       {cloud.target && (
+        <div className="settings-card cloud-account">
+          <strong>從雲端加入新書</strong>
+          <p className="quiet-note">
+            把 EPUB／TXT 直接放進 Drive 的「{cloud.target.name}
+            」資料夾即可；備份檔已改存在「備份資料」子資料夾，這裡只會列出尚未加入書架的書。
+          </p>
+          <div className="cloud-actions">
+            <button
+              className="secondary-button"
+              disabled={disabled}
+              onClick={() => {
+                setChosen(new Set())
+                void cloud.scanNewBooks()
+              }}
+            >
+              <Search size={18} />
+              查詢雲端新書
+            </button>
+            {!!candidates.length && (
+              <button
+                className="primary-button"
+                disabled={disabled || !selectedCandidates.length}
+                onClick={() => void cloud.importCloudBooks(selectedCandidates)}
+              >
+                <Plus size={18} />
+                加入所選 ({selectedCandidates.length})
+              </button>
+            )}
+          </div>
+          {cloud.candidates && !candidates.length && (
+            <p className="quiet-note">目前沒有尚未加入的檔案。</p>
+          )}
+          {!!candidates.length && (
+            <>
+              <button
+                className="secondary-button cloud-select-all"
+                disabled={!!cloud.busy}
+                onClick={() =>
+                  setChosen(
+                    chosen.size === candidates.length
+                      ? new Set()
+                      : new Set(candidates.map((entry) => entry.id)),
+                  )
+                }
+              >
+                {chosen.size === candidates.length ? '取消全選' : '全選'}
+              </button>
+              <ul className="cloud-books">
+                {candidates.map((entry) => (
+                  <li key={entry.id}>
+                    <label className="cloud-candidate">
+                      <input
+                        type="checkbox"
+                        checked={chosen.has(entry.id)}
+                        disabled={!!cloud.busy}
+                        onChange={() =>
+                          setChosen((previous) => {
+                            const next = new Set(previous)
+                            if (next.has(entry.id)) next.delete(entry.id)
+                            else next.add(entry.id)
+                            return next
+                          })
+                        }
+                      />
+                      <span>
+                        <strong>{entry.name}</strong>
+                        <small>{Math.max(1, Math.round(entry.size / 1024 / 1024))} MB 以內</small>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <p className="quiet-note">
+                加入後會沿用 Drive 上的原檔，不會再上傳一份；重複內容不會重複加入書架。
+              </p>
+            </>
+          )}
+        </div>
+      )}
+      {cloud.target && (
         <div className="cloud-notice" role="status">
           <strong>
             {cloud.busy ||
@@ -232,7 +322,8 @@ export function CloudLibraryScreen({
         <details>
           <summary>歷史備份</summary>
           <p className="quiet-note">
-            顯示最近 20 份。還原會套用該版本的書架與設定，之後新增的書籍仍保留。原檔按需下載。
+            每台裝置自動保留最近 10 份，較舊的會移到 Drive
+            垃圾桶。還原會套用該版本的書架與設定，之後新增的書籍仍保留。原檔按需下載。
           </p>
           <ul className="cloud-books">
             {cloud.history.map((entry) => (
@@ -259,8 +350,8 @@ export function CloudLibraryScreen({
       )}
       <p className="quiet-note">
         變更會在 App 開啟且已連接 Google 時自動同步。關閉 App
-        後無法保證背景上傳；大量匯入後，請等到顯示「已同步」。備份版本與已刪書籍原檔暫時保留，會占用
-        Drive 空間。
+        後無法保證背景上傳；大量匯入後，請等到顯示「已同步」。書籍原檔放在「
+        {cloud.target?.name ?? '看書'}」資料夾，備份索引與封面放在其中的「備份資料」子資料夾。
       </p>
       <CloudConfigForm
         config={cloud.config}

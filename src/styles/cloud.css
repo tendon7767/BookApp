@@ -160,3 +160,26 @@
 .cloud-status-button {
   font-size: var(--text-meta);
 }
+
+.cloud-candidate {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 4px 0;
+}
+.cloud-candidate strong {
+  display: block;
+  font-size: var(--text-body);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.cloud-candidate small {
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+.cloud-select-all {
+  margin-top: 12px;
+  align-self: flex-start;
+}
