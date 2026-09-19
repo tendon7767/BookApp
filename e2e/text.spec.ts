@@ -188,3 +188,38 @@ test('TXT decoder, first import and reopen work after the origin stops', async (
     if (!stopped) await stop()
   }
 })
+
+test('a swipe follows the finger, turns the page past the threshold and springs back below it', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('./')
+  await importText(page)
+  const surface = page.locator('.reader-touch-surface')
+  const sheet = page.locator('.reader-page')
+  const transform = () => sheet.evaluate((element) => element.style.transform)
+  async function drag(to: number, release = true) {
+    await page.mouse.move(320, 430)
+    await page.mouse.down()
+    for (const x of [300, 260, 200, to]) await page.mouse.move(x, 430, { steps: 4 })
+    const held = await transform()
+    if (release) await page.mouse.up()
+    return held
+  }
+  await expect(surface).toBeVisible()
+  const first = await savedOffset(page)
+  // Below the threshold the page tracks the finger and then returns to its place.
+  expect(await drag(290)).toMatch(/translate3d\(-?\d/)
+  await expect.poll(transform).toBe('')
+  expect(await savedOffset(page)).toBe(first)
+  // Past the threshold the drag completes into the next page.
+  expect(await drag(80)).toMatch(/translate3d\(-\d/)
+  await expect.poll(async () => await savedOffset(page)).toBeGreaterThan(first)
+  await expect.poll(transform).toBe('')
+  // Dragging back returns to the previous page.
+  await page.mouse.move(80, 430)
+  await page.mouse.down()
+  for (const x of [140, 220, 320]) await page.mouse.move(x, 430, { steps: 4 })
+  await page.mouse.up()
+  await expect.poll(async () => await savedOffset(page)).toBe(first)
+})

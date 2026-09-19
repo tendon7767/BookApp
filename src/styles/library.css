@@ -351,8 +351,10 @@ button.book-card-title:active {
   line-height: 1.8;
   margin-top: 8px;
 }
+/* Sized from the viewport height so the reading button stays above the fold;
+   the width follows the 2 / 3 cover ratio. */
 .book-detail-cover {
-  width: min(210px, 58%);
+  width: min(58%, 213px, calc(36dvh / 1.5));
   margin: 6px auto 22px;
 }
 .book-dialog .sheet-body > h2 {

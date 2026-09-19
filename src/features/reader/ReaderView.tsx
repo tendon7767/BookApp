@@ -79,6 +79,8 @@ export function ReaderView({
     }
   })
   const [flip, setFlip] = useState<{ gesture: 'next' | 'previous'; count: number } | null>(null)
+  const page = useRef<HTMLDivElement>(null)
+  const turning = useRef(false)
   const seekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const setReaderNotice = reader.setNotice
   useEffect(() => () => clearTimeout(seekTimer.current), [])
@@ -117,6 +119,40 @@ export function ReaderView({
     void Promise.resolve(result).then(() =>
       setFlip((previous) => ({ gesture, count: (previous?.count ?? 0) + 1 })),
     )
+  }
+  const sliding = reader.readingSettings.pageAnimation !== 'none'
+  function shift(offset: number, duration = 0) {
+    const element = page.current
+    if (!element) return
+    element.style.transition = duration ? `transform ${duration}ms ease-out` : 'none'
+    element.style.transform = offset ? `translate3d(${offset}px, 0, 0)` : ''
+  }
+  // The page follows the finger; an edge resists instead of opening a gap.
+  function dragMove(dx: number) {
+    if (turning.current) return
+    // A running turn animation would otherwise outrank the inline transform.
+    if (flip) setFlip(null)
+    const blocked = dx > 0 ? reader.position?.atStart : reader.position?.atEnd
+    shift(blocked ? dx / 4 : dx)
+  }
+  function dragEnd(dx: number, width: number) {
+    if (turning.current) return
+    const gesture = dx < 0 ? 'next' : 'previous'
+    const blocked = dx > 0 ? reader.position?.atStart : reader.position?.atEnd
+    if (blocked || reader.busy || Math.abs(dx) < Math.max(56, width * 0.2)) {
+      shift(0, 180)
+      return
+    }
+    // Finish the drag off-screen first; the arriving page then slides in from the other side.
+    turning.current = true
+    shift(dx < 0 ? -width : width, 130)
+    setTimeout(() => {
+      void Promise.resolve(reader.act(gesture)).finally(() => {
+        shift(0)
+        turning.current = false
+        setFlip((previous) => ({ gesture, count: (previous?.count ?? 0) + 1 }))
+      })
+    }, 130)
   }
   const flipOffset = flip?.gesture === 'previous' ? '-24px' : '24px'
   const percentage = reader.position?.percentage
@@ -184,6 +220,7 @@ export function ReaderView({
       }}
     >
       <div
+        ref={page}
         className={`reader-page${flip ? ` reader-flip-${flip.count % 2 ? 'a' : 'b'}` : ''}`}
         style={
           {
@@ -194,7 +231,14 @@ export function ReaderView({
       >
         {children}
       </div>
-      {reader.ready && <ReaderGestures tapZones={zones} onGesture={act} />}
+      {reader.ready && (
+        <ReaderGestures
+          tapZones={zones}
+          onGesture={act}
+          onDragMove={sliding ? dragMove : undefined}
+          onDragEnd={sliding ? dragEnd : undefined}
+        />
+      )}
       {hint && reader.ready && <TapZoneHint tapZones={zones} />}
       {!reader.ready && (
         <div className="reader-loading" role={reader.error ? 'alert' : 'status'}>
