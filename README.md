@@ -90,12 +90,11 @@ npm run preview -- --host localhost
 
 目標 repository：`tendon7767/BookApp`，base / manifest / Service Worker scope 已配置 `/BookApp/`。更換部署路徑時需一起修改 `vite.config.ts`。
 
-1. 將程式推送至 repository 的 `main`。
-2. 在 GitHub **Settings → Pages → Source** 選 **GitHub Actions**。
-3. 在 **Actions → Publish to GitHub Pages → Run workflow** 發布。
-4. 成功後以 workflow 回傳的 HTTPS 網址在 iPhone 測試。
+1. 在 GitHub **Settings → Pages → Source** 選 **GitHub Actions**（只需設定一次）。
+2. 將程式推送或合併至 `main`，發布會自動執行；也可在 **Actions → Publish to GitHub Pages → Run workflow** 手動重跑。
+3. 成功後以 workflow 回傳的 HTTPS 網址在 iPhone 測試；App 重開時才會提示更新。
 
-一般 push / pull request 只執行 CI，不自動發布。發布流程也會先跑 lint、unit tests、build、Chromium 與 WebKit 測試。原創測試 EPUB 由 `tests/fixtures/epub.ts` 動態生成；不提交使用者的書籍或 Google 憑證。
+CI 分工以縮短等待：pull request 只跑一輪 Check（Chromium），合併到 `main` 後 Check 補跑 Chromium 與 WebKit，發布流程同時進行，只跑 lint、unit tests 與帶入 Google 設定的 build。瀏覽器依 `@playwright/test` 版本快取。因此瀏覽器測試的完整把關發生在合併前的 Chromium 與合併後的兩個引擎，發布本身不再重跑一次。原創測試 EPUB 由 `tests/fixtures/epub.ts` 動態生成；不提交使用者的書籍或 Google 憑證。
 
 ## 重要行為
 

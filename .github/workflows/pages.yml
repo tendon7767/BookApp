@@ -1,6 +1,9 @@
 name: Publish to GitHub Pages
-# Publish intentionally, after review; ordinary pushes only run validation.
+# Publishes every push to main. Browser tests already gated the pull request and
+# run again on main in parallel through the Check workflow.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,21 +20,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Lints, runs the unit tests and builds dist with the published Google configuration.
       - run: npm run check
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
           VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
           VITE_GOOGLE_APP_ID: ${{ vars.VITE_GOOGLE_APP_ID }}
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run test:e2e
-      - uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: playwright-report-pages
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v5
         with:

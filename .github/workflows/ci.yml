@@ -1,12 +1,20 @@
 name: Check
+# A pull request runs once (the push event is limited to main), gates on
+# Chromium, and reuses cached browsers; main still runs both engines.
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      BROWSERS: ${{ github.event_name == 'pull_request' && 'chromium' || 'chromium webkit' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -15,8 +23,23 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run test:e2e
+      - id: playwright
+        run: |
+          version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ env.BROWSERS }}
+      # System packages live outside the cache, so they are installed either way.
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps $BROWSERS
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps $BROWSERS
+      - run: npm run test:e2e -- $PLAYWRIGHT_ARGS
+        env:
+          PLAYWRIGHT_ARGS: ${{ github.event_name == 'pull_request' && '--project=chromium' || '' }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
